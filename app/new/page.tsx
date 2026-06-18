@@ -19,6 +19,7 @@ export default function NewPostPage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("0.02");
   const [status, setStatus] = useState<Status>("idle");
+  const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const connected = account.status === "connected" && account.address;
@@ -54,10 +55,12 @@ export default function NewPostPage() {
       body.set("wallet", account.address as string);
 
       const res = await fetch("/api/posts", { method: "POST", body });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error ?? "Upload failed");
-      }
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        jobId?: string;
+      };
+      if (!res.ok) throw new Error(j.error ?? "Upload failed");
+      setJobId(j.jobId ?? null);
       setStatus("done");
     } catch (err) {
       setStatus("idle");
@@ -103,7 +106,7 @@ export default function NewPostPage() {
 
       <div className="mx-auto w-full max-w-md flex-1 px-[18px] pt-[18px] pb-28">
         {status === "done" ? (
-          <Done onAnother={() => resetTo("idle")} router={router} />
+          <Done jobId={jobId} onAnother={() => resetTo("idle")} router={router} />
         ) : (
           <>
             {!connected && (
@@ -230,14 +233,17 @@ export default function NewPostPage() {
     setTitle("");
     setPrice("0.02");
     setError(null);
+    setJobId(null);
     setStatus(s);
   }
 }
 
 function Done({
+  jobId,
   onAnother,
   router,
 }: {
+  jobId: string | null;
   onAnother: () => void;
   router: ReturnType<typeof useRouter>;
 }) {
@@ -252,20 +258,28 @@ function Done({
       <div>
         <p className="text-text text-lg font-semibold">Uploaded</p>
         <p className="text-muted mt-1 max-w-xs text-sm">
-          Your post is processing. It goes live once the auto-blur preview is
-          ready and you approve it.
+          Your post is processing. Review the auto-blur preview, then approve to
+          publish — nothing goes live until you do.
         </p>
       </div>
       <div className="flex w-full max-w-xs flex-col gap-2">
+        {jobId && (
+          <Link
+            href={`/blur-review/${jobId}`}
+            className="bg-primary text-primary-fg flex h-12 items-center justify-center gap-1.5 rounded-pill font-semibold transition-transform active:scale-[0.98]"
+          >
+            <ShieldCheck size={18} /> Review &amp; approve
+          </Link>
+        )}
         <button
           onClick={() => router.push("/")}
-          className="bg-primary text-primary-fg h-12 rounded-pill font-semibold transition-transform active:scale-[0.98]"
+          className={`${jobId ? "bg-surface-2 text-text border-hairline border" : "bg-primary text-primary-fg"} h-12 rounded-pill font-semibold transition-transform active:scale-[0.98]`}
         >
           Back to feed
         </button>
         <button
           onClick={onAnother}
-          className="bg-surface-2 text-text border-hairline h-12 rounded-pill border font-semibold transition-transform active:scale-[0.98]"
+          className="text-muted h-11 rounded-pill font-semibold transition-transform active:scale-[0.98]"
         >
           Post another
         </button>

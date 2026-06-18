@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+
+const PROCESSING = ["uploaded", "detecting", "tracking", "compositing"];
 import { ShieldCheck, RotateCcw, UserCog, CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { RegionOverlay } from "./RegionOverlay";
@@ -30,6 +32,25 @@ export function ReviewPanel({
   const [error, setError] = useState<string | null>(null);
 
   const reviewable = state === "ready_for_review";
+
+  // While the pipeline is still running, poll until it reaches a terminal state,
+  // then refresh so the server re-presigns the freshly-composited preview.
+  useEffect(() => {
+    if (!PROCESSING.includes(state)) return;
+    const iv = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/blur/jobs/${jobId}`);
+        const d = (await r.json()) as { status?: string };
+        if (d.status && d.status !== state) {
+          setState(d.status);
+          if (!PROCESSING.includes(d.status)) router.refresh();
+        }
+      } catch {
+        /* transient — keep polling */
+      }
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [state, jobId, router]);
 
   async function run(action: Action) {
     setBusy(action);

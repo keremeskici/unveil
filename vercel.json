@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "SERWIST_SUPPRESS_TURBOPACK_WARNING=1 next build --webpack"
+}

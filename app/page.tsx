@@ -1,4 +1,5 @@
 import { getFeed } from "@/lib/db/queries";
+import { presignPrivateGet } from "@/lib/blob";
 import { PostCard, type FeedPost } from "@/components/PostCard";
 import { TopBar } from "@/components/TopBar";
 
@@ -8,17 +9,20 @@ export const dynamic = "force-dynamic";
 async function loadFeed(): Promise<FeedPost[] | null> {
   try {
     const rows = await getFeed(20, 0);
-    return rows.map((p) => ({
-      id: p.id,
-      title: p.title,
-      blurredPreviewUrl: p.blurredPreviewUrl,
-      unlockPrice: p.unlockPrice,
-      mediaType: p.mediaType,
-      creator: {
-        username: p.creator?.username ?? null,
-        avatar: p.creator?.avatar ?? null,
-      },
-    }));
+    return Promise.all(
+      rows.map(async (p) => ({
+        id: p.id,
+        title: p.title,
+        // Preview blob is private; presign with a long TTL for the feed.
+        blurredPreviewUrl: await presignPrivateGet(p.blurredPreviewUrl, 3600),
+        unlockPrice: p.unlockPrice,
+        mediaType: p.mediaType,
+        creator: {
+          username: p.creator?.username ?? null,
+          avatar: p.creator?.avatar ?? null,
+        },
+      })),
+    );
   } catch {
     // DB not provisioned yet — show the empty state instead of crashing.
     return null;

@@ -3,17 +3,30 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAppAuth, useAppUser } from "./useAppAuth";
 
-// localStorage key that snoozes the enrollment prompt. Stores a future epoch-ms
-// timestamp; while `Date.now()` is below it, the prompt stays hidden.
-const REMIND_AFTER_KEY = "veil:passkey-remind-after";
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+// Older builds persisted a 7-day "Later" snooze here. We now nudge on every
+// login until the user enrolls, so this key is only referenced to clear stale
+// values left behind on returning browsers.
+const LEGACY_REMIND_AFTER_KEY = "veil:passkey-remind-after";
 
 // Fired after a passkey is created so every mounted instance (prompt, settings,
-// notifications) re-reads dismissal state and re-renders.
+// notifications) re-reads state and re-renders.
 export const PASSKEY_CREATED_EVENT = "veil:passkey-created";
-// Fired when the "Later" snooze changes so sibling instances stay in sync
-// within the same tab (the native `storage` event only crosses tabs).
-const REMIND_CHANGED_EVENT = "veil:passkey-remind-changed";
+// Fired when the session dismissal changes so sibling hook instances in the
+// same tab stay in sync.
+const DISMISS_CHANGED_EVENT = "veil:passkey-dismiss-changed";
+
+// Session-only dismissal: clicking "Later" hides the prompt for the current
+// page session but does NOT persist. A full reload or a fresh login resets it,
+// so the user is nudged again until they enroll. Module-level so every hook
+// instance shares the same value.
+let sessionDismissed = false;
+
+function setSessionDismissed(value: boolean) {
+  sessionDismissed = value;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(DISMISS_CHANGED_EVENT));
+  }
+}
 
 // Minimal view of the Clerk `UserResource` surface we touch. The dev-auth user
 // object has none of these methods, which is how we tell the two apart.
@@ -29,27 +42,6 @@ function isEnrollableUser(user: unknown): user is EnrollableUser {
     user !== null &&
     typeof (user as { createPasskey?: unknown }).createPasskey === "function"
   );
-}
-
-function readRemindAfter(): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    const raw = window.localStorage.getItem(REMIND_AFTER_KEY);
-    const ts = raw ? Number(raw) : 0;
-    return Number.isFinite(ts) ? ts : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeRemindAfter(value: number | null) {
-  try {
-    if (value === null) window.localStorage.removeItem(REMIND_AFTER_KEY);
-    else window.localStorage.setItem(REMIND_AFTER_KEY, String(value));
-  } catch {
-    // Private mode / storage disabled — dismissal just won't persist.
-  }
-  window.dispatchEvent(new Event(REMIND_CHANGED_EVENT));
 }
 
 // Maps a thrown enrollment error to either a silent success (passkey already
@@ -106,19 +98,24 @@ export function usePasskeyEnrollment(): PasskeyEnrollment {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [remindAfter, setRemindAfter] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
 
-  // Read dismissal on mount and stay in sync with sibling instances + other tabs.
+  // Mirror the shared session-dismissal flag and keep sibling instances in sync.
   useEffect(() => {
-    const sync = () => setRemindAfter(readRemindAfter());
+    // One-time cleanup of the retired 7-day localStorage snooze, so browsers
+    // that snoozed under the old behavior are nudged again.
+    try {
+      window.localStorage.removeItem(LEGACY_REMIND_AFTER_KEY);
+    } catch {
+      // storage disabled — nothing to clean up.
+    }
+    const sync = () => setDismissed(sessionDismissed);
     sync();
-    window.addEventListener(REMIND_CHANGED_EVENT, sync);
+    window.addEventListener(DISMISS_CHANGED_EVENT, sync);
     window.addEventListener(PASSKEY_CREATED_EVENT, sync);
-    window.addEventListener("storage", sync);
     return () => {
-      window.removeEventListener(REMIND_CHANGED_EVENT, sync);
+      window.removeEventListener(DISMISS_CHANGED_EVENT, sync);
       window.removeEventListener(PASSKEY_CREATED_EVENT, sync);
-      window.removeEventListener("storage", sync);
     };
   }, []);
 
@@ -130,11 +127,10 @@ export function usePasskeyEnrollment(): PasskeyEnrollment {
   const isLoaded = Boolean(authLoaded) && Boolean(userLoaded);
   const canEnroll =
     isLoaded && isSignedIn === true && Boolean(enrollableUser) && !hasPasskey;
-  const isDismissed = remindAfter > Date.now();
 
   const dismissPrompt = useCallback(() => {
-    setRemindAfter(Date.now() + SEVEN_DAYS_MS);
-    writeRemindAfter(Date.now() + SEVEN_DAYS_MS);
+    setSessionDismissed(true);
+    setDismissed(true);
   }, []);
 
   const enrollPasskey = useCallback(async () => {
@@ -146,7 +142,7 @@ export function usePasskeyEnrollment(): PasskeyEnrollment {
       await enrollableUser.createPasskey();
       await enrollableUser.reload();
       setSuccess(true);
-      writeRemindAfter(null);
+      setSessionDismissed(false);
       window.dispatchEvent(new Event(PASSKEY_CREATED_EVENT));
     } catch (err) {
       const { alreadyExists, message } = classifyEnrollError(err);
@@ -155,7 +151,7 @@ export function usePasskeyEnrollment(): PasskeyEnrollment {
         // state instead of surfacing an error.
         await enrollableUser.reload().catch(() => {});
         setSuccess(true);
-        writeRemindAfter(null);
+        setSessionDismissed(false);
         window.dispatchEvent(new Event(PASSKEY_CREATED_EVENT));
       } else {
         setError(message);
@@ -175,6 +171,6 @@ export function usePasskeyEnrollment(): PasskeyEnrollment {
     success,
     enrollPasskey,
     dismissPrompt,
-    isDismissed,
+    isDismissed: dismissed,
   };
 }

@@ -46,6 +46,7 @@ type Payment = {
 type Tab = "cards" | "payments";
 
 const AMOUNTS = ["10", "25", "50"] as const;
+const TOP_UP_AMOUNTS = ["5", "10", "20", "50", "100"] as const;
 
 function money(value: string | number | null | undefined) {
   const amount = Number(value ?? 0);
@@ -98,7 +99,9 @@ export default function PaymentCardsPage() {
   const [pendingDepositId, setPendingDepositId] = useState<string | null>(null);
   const [pendingAmount, setPendingAmount] = useState<string | null>(null);
   const [mockCardAdded, setMockCardAdded] = useState(false);
-  const [rechargePrimary, setRechargePrimary] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState<string | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +192,28 @@ export default function PaymentCardsPage() {
     }
   }
 
+  async function quickTopUp(amount: string) {
+    if (submitting) return;
+    setTopUpAmount(amount);
+    try {
+      await startDeposit(amount);
+    } finally {
+      setTopUpAmount(null);
+    }
+  }
+
+  function submitCustom() {
+    const value = Number(customAmount);
+    if (!Number.isFinite(value) || value < 1 || value > 500) {
+      setError("Enter an amount between $1 and $500.");
+      return;
+    }
+    const normalized = value % 1 === 0 ? String(value) : value.toFixed(2);
+    setCustomOpen(false);
+    setCustomAmount("");
+    void quickTopUp(normalized);
+  }
+
   async function completeMockDeposit(depositId: string, amount: string) {
     const res = await fetch("/api/account/deposit/mock", {
       method: "POST",
@@ -248,12 +273,6 @@ export default function PaymentCardsPage() {
           </h1>
           <button
             type="button"
-            className="text-primary hover:text-primary-hover flex h-9 items-center px-1 text-[13px] font-bold"
-          >
-            VERIFY
-          </button>
-          <button
-            type="button"
             aria-label="Add billing method"
             onClick={() => setSheetOpen(true)}
             className="text-muted hover:text-text -mr-2 flex size-[38px] items-center justify-center"
@@ -298,26 +317,96 @@ export default function PaymentCardsPage() {
                 <CreditCard size={18} />
                 ADD BILLING METHOD
               </Button>
-              <button
-                type="button"
-                onClick={() => setRechargePrimary((value) => !value)}
-                className="mt-7 flex min-h-11 w-full items-center justify-between gap-4 text-left"
-              >
-                <span className="text-[15px] font-medium leading-[1.25]">
-                  Make wallet primary method for rebills
-                </span>
-                <span
-                  className="relative h-6 w-[42px] shrink-0 rounded-pill transition-colors"
-                  style={{
-                    background: rechargePrimary ? "var(--primary)" : "var(--surface-3)",
-                  }}
-                >
-                  <span
-                    className="absolute top-0.5 size-5 rounded-full bg-white transition-[left]"
-                    style={{ left: rechargePrimary ? 20 : 2, boxShadow: "0 1px 3px rgba(0,0,0,.3)" }}
-                  />
-                </span>
-              </button>
+
+              <div className="mt-7">
+                <h3 className="text-faint text-[12px] font-bold uppercase tracking-[0.04em]">
+                  Quick top-up
+                </h3>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {TOP_UP_AMOUNTS.map((amount) => {
+                    const active = topUpAmount === amount;
+                    return (
+                      <button
+                        key={amount}
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => quickTopUp(amount)}
+                        className={`flex h-12 items-center justify-center rounded-md border text-[16px] font-semibold transition-colors disabled:opacity-50 ${
+                          active
+                            ? "border-primary bg-primary-tint text-primary"
+                            : "border-hairline bg-surface-2 text-text hover:bg-surface-3"
+                        }`}
+                      >
+                        {active ? (
+                          <span
+                            aria-hidden
+                            className="size-[17px] rounded-full border-2 border-[color:var(--primary)]/35 border-t-[color:var(--primary)]"
+                            style={{ animation: "vspin 0.7s linear infinite" }}
+                          />
+                        ) : (
+                          money(amount)
+                        )}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    aria-expanded={customOpen}
+                    onClick={() => {
+                      setCustomOpen((value) => !value);
+                      setError(null);
+                    }}
+                    className={`flex h-12 items-center justify-center rounded-md border text-[15px] font-semibold transition-colors ${
+                      customOpen
+                        ? "border-primary bg-primary-tint text-primary"
+                        : "border-hairline bg-surface-2 text-text hover:bg-surface-3"
+                    }`}
+                  >
+                    Custom
+                  </button>
+                </div>
+
+                {customOpen && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      submitCustom();
+                    }}
+                    className="mt-3 flex gap-2"
+                  >
+                    <div className="relative flex-1">
+                      <span className="text-muted pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[16px]">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={1}
+                        max={500}
+                        step="1"
+                        autoFocus
+                        value={customAmount}
+                        onChange={(event) => setCustomAmount(event.target.value)}
+                        placeholder="Amount"
+                        className="bg-surface-2 border-hairline text-text h-12 w-full rounded-md border pl-8 pr-4 text-[16px] outline-none focus-visible:border-[color:var(--primary)]"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      loading={submitting}
+                      className="shrink-0 px-6"
+                    >
+                      ADD
+                    </Button>
+                  </form>
+                )}
+
+                {!sheetOpen && error && (
+                  <p className="text-danger mt-3 text-[14px] font-semibold" role="alert">
+                    {error}
+                  </p>
+                )}
+              </div>
             </section>
 
             <section className="px-[18px] py-7">
@@ -435,7 +524,7 @@ export default function PaymentCardsPage() {
                 <input
                   value="4242 4242 4242 4242"
                   readOnly
-                  className="bg-surface-2 border-hairline text-text mt-2 h-[50px] w-full rounded-md border px-4 text-[16px] outline-none"
+                  className="bg-surface-2 border-hairline text-text mt-2 h-[50px] w-full rounded-md border px-4 text-[16px] outline-none focus-visible:border-[color:var(--primary)]"
                 />
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -446,7 +535,7 @@ export default function PaymentCardsPage() {
                   <input
                     value="04/29"
                     readOnly
-                    className="bg-surface-2 border-hairline text-text mt-2 h-[50px] w-full rounded-md border px-4 text-[16px] outline-none"
+                    className="bg-surface-2 border-hairline text-text mt-2 h-[50px] w-full rounded-md border px-4 text-[16px] outline-none focus-visible:border-[color:var(--primary)]"
                   />
                 </label>
                 <label className="block">
@@ -456,7 +545,7 @@ export default function PaymentCardsPage() {
                   <input
                     value="123"
                     readOnly
-                    className="bg-surface-2 border-hairline text-text mt-2 h-[50px] w-full rounded-md border px-4 text-[16px] outline-none"
+                    className="bg-surface-2 border-hairline text-text mt-2 h-[50px] w-full rounded-md border px-4 text-[16px] outline-none focus-visible:border-[color:var(--primary)]"
                   />
                 </label>
               </div>
@@ -512,6 +601,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className="relative flex h-full min-w-[126px] items-center justify-center overflow-hidden whitespace-nowrap text-[13px] font-bold tracking-[0.02em]"
       style={{ color: active ? "var(--text)" : "var(--faint)" }}
     >

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { eq, and, asc, desc, inArray, ne, sql, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, inArray, ne, or, sql, isNull } from "drizzle-orm";
 import { getDb } from "./index";
 import {
   users,
@@ -51,6 +51,23 @@ function usernameBase(input: ClerkUserInput) {
 
   if (!base) return null;
   return base.length >= 3 ? base.slice(0, 20) : base.padEnd(3, "_");
+}
+
+const DEV_UNVEIL_TEST_VIDEO_KEY =
+  "blur-jobs/e21b3b6a-c292-4bdf-a8ae-087f17059b3c/blurred.mp4";
+const DEV_UNVEIL_TEST_POST_ID = "faf412aa-2767-4289-8508-0d2079506e5c";
+
+function hideOwnPostsExceptDevUnveilTestPost(excludeCreatorId: string) {
+  const ownPostFilter = ne(posts.creatorId, excludeCreatorId);
+  if (process.env.NODE_ENV !== "development") return ownPostFilter;
+
+  // Keep the processed test video visible in the dev feed so the dev account can
+  // repeatedly exercise the per-region unveil flow, even when it owns the post.
+  return or(ownPostFilter, eq(posts.blurredPreviewUrl, DEV_UNVEIL_TEST_VIDEO_KEY));
+}
+
+function shouldResetDevUnveilFixture(postId: string) {
+  return process.env.NODE_ENV === "development" && postId === DEV_UNVEIL_TEST_POST_ID;
 }
 
 function usernameCandidate(base: string, attempt: number) {
@@ -234,10 +251,17 @@ export async function markUserCreator(userId: string) {
   return user;
 }
 
-export async function getFeed(limit = 20, offset = 0) {
+export async function getFeed(limit = 20, offset = 0, excludeCreatorId?: string) {
   const db = getDb();
   return db.query.posts.findMany({
-    where: eq(posts.isPublished, true),
+    // A creator does not see their own posts in the feed, except the local
+    // processed-video fixture used to test per-region unveil in development.
+    where: excludeCreatorId
+      ? and(
+          eq(posts.isPublished, true),
+          hideOwnPostsExceptDevUnveilTestPost(excludeCreatorId),
+        )
+      : eq(posts.isPublished, true),
     with: { creator: true },
     orderBy: [desc(posts.createdAt)],
     limit,
@@ -277,7 +301,7 @@ export async function getPostRegionsWithUnlocks(postId: string, fanId?: string) 
   if (regions.length === 0) return [];
 
   const unlockedIds = new Set<string>();
-  if (fanId) {
+  if (fanId && !shouldResetDevUnveilFixture(postId)) {
     const rows = await db.query.regionUnlocks.findMany({
       where: and(
         eq(regionUnlocks.fanId, fanId),
@@ -295,6 +319,9 @@ export async function getPostRegionsWithUnlocks(postId: string, fanId?: string) 
     return {
       id: r.id,
       rect: r.rect,
+      // Position track is not sensitive — it just mirrors where the blur the fan
+      // already sees moves — so it's returned whether or not the region is owned.
+      track: r.track,
       position: r.position,
       unlocked,
       // Only owned crops expose their key for presigning.

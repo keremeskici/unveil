@@ -1,13 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { getPost } from "@/lib/db/queries";
-import {
-  getThreadFor,
-  getMessages,
-  markThreadRead,
-  sendMessage,
-} from "@/lib/db/messages";
-import { presignPrivateGet } from "@/lib/blob";
-import { formatUsd } from "@/lib/constants";
+import { getThreadFor, markThreadRead, sendMessage } from "@/lib/db/messages";
+import { buildConversationView } from "@/lib/messages-view";
+import { maybeReplyToBotThread } from "@/lib/bot";
 import {
   requireCurrentAppUser,
   unauthorizedJson,
@@ -22,6 +17,8 @@ type Params = { params: Promise<{ id: string }> };
  * GET /api/messages/[id] — a conversation. PPV messages are resolved
  * per-viewer: the sender sees their locked card, an unlocked recipient gets a
  * presigned real-media URL, everyone else gets the blurred preview + price.
+ * Used for client refreshes after a send — the initial load is server-rendered
+ * by app/messages/[id]/page.tsx via the same builder.
  */
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -33,65 +30,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     throw err;
   }
 
-  const thread = await getThreadFor(user.id, id);
-  if (!thread) return Response.json({ error: "Thread not found" }, { status: 404 });
+  const view = await buildConversationView(user.id, id);
+  if (!view) return Response.json({ error: "Thread not found" }, { status: 404 });
 
-  const rows = await getMessages(id, user.id);
+  // Clearing the unread badge is a side effect — don't make the response wait
+  // on the write. `after` runs it once the response is on its way.
+  after(() => markThreadRead(id, user.id));
 
-  const messages = await Promise.all(
-    rows.map(async (m) => {
-      const me = m.senderId === user.id;
-      if (m.kind !== "ppv" || !m.postId) {
-        return { id: m.id, kind: "text" as const, me, text: m.body ?? "" };
-      }
-      // Recipient who has paid → reveal the real media.
-      if (!me && m.viewerUnlockId) {
-        return {
-          id: m.id,
-          kind: "ppv" as const,
-          me,
-          revealed: true,
-          title: m.postTitle ?? "",
-          caption: m.body ?? "",
-          url: m.privateMediaKey
-            ? await presignPrivateGet(m.privateMediaKey, 300)
-            : null,
-          mediaType: m.mediaType,
-        };
-      }
-      // Sender's own card, or a recipient who hasn't unlocked → preview only.
-      return {
-        id: m.id,
-        kind: "ppv" as const,
-        me,
-        revealed: false,
-        postId: m.postId,
-        title: m.postTitle ?? "",
-        caption: m.body ?? "",
-        price: m.unlockPrice ?? "0",
-        priceLabel: m.unlockPrice ? `$${formatUsd(m.unlockPrice)}` : "$0",
-        previewUrl: m.blurredPreviewUrl
-          ? await presignPrivateGet(m.blurredPreviewUrl, 3600)
-          : null,
-        mediaType: m.mediaType,
-      };
-    }),
-  );
-
-  // Now that the viewer has loaded it, clear their unread badge for this thread.
-  await markThreadRead(id, user.id);
-
-  const other = thread.creatorId === user.id ? thread.fan : thread.creator;
-  return Response.json({
-    thread: {
-      id: thread.id,
-      name: other.username ?? `@${other.walletAddress.slice(2, 8).toLowerCase()}`,
-      avatar: other.avatar,
-      // Whether the *viewer* is the creator side — gates PPV composing.
-      viewerIsCreator: thread.creatorId === user.id,
-    },
-    messages,
-  });
+  return Response.json(view);
 }
 
 /**
@@ -151,5 +97,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     kind: "text",
     body: text,
   });
-  return Response.json({ ok: true, id: msg.id });
+  const botReply = await maybeReplyToBotThread(id, user.id);
+  return Response.json({ ok: true, id: msg.id, botReply });
 }

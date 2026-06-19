@@ -135,7 +135,7 @@ export function ReviewPanel({
               src={previewUrl}
               controls
               playsInline
-              className="w-full rounded-md"
+              className="aspect-[4/5] w-full rounded-md object-cover"
             />
           ) : (
             <RegionOverlay src={previewUrl} regions={regions} alt="Blurred preview" />
@@ -182,6 +182,7 @@ export function ReviewPanel({
                     type="button"
                     onClick={() => setAccessMode(mode)}
                     disabled={!!busy}
+                    aria-pressed={accessMode === mode}
                     className="flex-1 rounded-pill px-3 py-1.5 text-[13px] font-semibold transition-colors"
                     style={
                       accessMode === mode

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomNav } from "@/components/BottomNav";
@@ -9,44 +10,45 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { EmptyState } from "@/components/EmptyState";
 import { timeAgo } from "@/lib/time";
 import { useAppAuth } from "@/components/useAppAuth";
+import { fetchMessages, messagesQueryKey } from "@/lib/messages-client";
 
-type Thread = {
-  id: string;
-  name: string;
-  avatar: string | null;
-  preview: string;
-  at: string;
-  unread: number;
-};
+function MessagesSkeleton() {
+  return (
+    <ul className="px-[18px]">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <li key={i} className="border-hairline flex items-center gap-3.5 border-b py-3.5">
+          <span className="bg-surface-3 size-11 rounded-full" />
+          <span className="min-w-0 flex-1 space-y-2">
+            <span className="bg-surface-3 block h-4 w-32 rounded-full" />
+            <span className="bg-surface-3 block h-3 w-48 max-w-full rounded-full" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function MessagesPage() {
   const { isSignedIn } = useAppAuth();
   const connected = isSignedIn === true;
-  const [threads, setThreads] = useState<Thread[] | null>(null);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const messages = useQuery({
+    queryKey: messagesQueryKey,
+    queryFn: fetchMessages,
+    enabled: connected,
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    if (!connected) return;
-    let live = true;
-    setThreads(null);
-    fetch("/api/messages")
-      .then((r) => r.json())
-      .then((d) => live && setThreads(d.threads ?? []))
-      .catch(() => live && setThreads([]));
-    return () => {
-      live = false;
-    };
-  }, [connected]);
-
+  const threads = messages.data?.threads ?? [];
   const unreadTotal = threads?.reduce((n, t) => n + (t.unread > 0 ? 1 : 0), 0) ?? 0;
   const visible =
-    filter === "unread" ? (threads ?? []).filter((t) => t.unread > 0) : threads ?? [];
+    filter === "unread" ? threads.filter((t) => t.unread > 0) : threads;
 
   return (
     <main className="flex min-h-dvh flex-1 flex-col">
       <header className="bg-surface/80 border-hairline pt-safe sticky top-0 z-40 border-b backdrop-blur-xl">
         <div className="mx-auto w-full max-w-md px-[18px] py-3.5">
-          <span className="text-xl font-bold">Messages</span>
+          <h1 className="text-xl font-bold">Messages</h1>
         </div>
       </header>
 
@@ -64,19 +66,26 @@ export default function MessagesPage() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2.5 px-[18px] pt-3.5 pb-2.5">
+            {/* Filter chips — same treatment as the Notifications tab. */}
+            <div className="border-hairline flex gap-2.5 overflow-x-auto border-b px-[18px] py-3.5">
               <button
                 type="button"
                 onClick={() => setFilter("all")}
-                className="rounded-pill px-4 py-1.5 text-[13px] font-semibold"
+                aria-pressed={filter === "all"}
+                className="shrink-0 rounded-pill px-4 py-2 text-[13.5px] transition-transform active:scale-95"
                 style={
                   filter === "all"
                     ? {
-                        background: "var(--primary-tint)",
+                        background: "var(--tint)",
                         border: "1px solid rgba(194,20,59,.35)",
                         color: "var(--text)",
+                        fontWeight: 600,
                       }
-                    : { background: "var(--surface-2)", color: "var(--text-muted)" }
+                    : {
+                        background: "var(--surface-2)",
+                        border: "1px solid transparent",
+                        color: "var(--muted)",
+                      }
                 }
               >
                 All
@@ -84,20 +93,41 @@ export default function MessagesPage() {
               <button
                 type="button"
                 onClick={() => setFilter("unread")}
-                className="bg-surface-2 text-muted flex items-center gap-1.5 rounded-pill px-4 py-1.5 text-[13px] font-medium"
+                aria-pressed={filter === "unread"}
+                className="flex shrink-0 items-center gap-1.5 rounded-pill px-4 py-2 text-[13.5px] transition-transform active:scale-95"
                 style={
                   filter === "unread"
-                    ? { background: "var(--primary-tint)", color: "var(--text)" }
-                    : undefined
+                    ? {
+                        background: "var(--tint)",
+                        border: "1px solid rgba(194,20,59,.35)",
+                        color: "var(--text)",
+                        fontWeight: 600,
+                      }
+                    : {
+                        background: "var(--surface-2)",
+                        border: "1px solid transparent",
+                        color: "var(--muted)",
+                      }
                 }
               >
-                Unread <span className="tabular text-primary">{unreadTotal}</span>
+                Unread
+                {unreadTotal > 0 && (
+                  <span className="tabular text-primary">{unreadTotal}</span>
+                )}
               </button>
             </div>
 
             <div key={filter} className="tab-panel">
-              {threads === null ? (
-                <p className="text-faint mt-16 text-center text-sm">Loading…</p>
+              {messages.isLoading ? (
+                <MessagesSkeleton />
+              ) : messages.isError ? (
+                <div className="mt-10">
+                  <EmptyState
+                    icon={MessageCircle}
+                    title="Could not load messages"
+                    body="Check your connection and try again."
+                  />
+                </div>
               ) : visible.length === 0 ? (
                 <div className="mt-10">
                   <EmptyState

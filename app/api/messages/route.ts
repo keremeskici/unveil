@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { upsertCreator } from "@/lib/db/queries";
 import { listThreads, getOrCreateThread } from "@/lib/db/messages";
+import { getOrCreateBotThreadForUser, getOrCreateBotUser } from "@/lib/bot";
 import {
   requireCurrentAppUser,
   unauthorizedJson,
@@ -28,15 +29,21 @@ export async function GET() {
     throw err;
   }
 
+  const bot = await getOrCreateBotUser();
+  await getOrCreateBotThreadForUser(user.id);
+
   const rows = await listThreads(user.id);
-  const threads = rows.map((t) => ({
-    id: t.id,
-    name: handleFor(t.other),
-    avatar: t.other.avatar,
-    preview: t.preview,
-    at: t.lastMessageAt,
-    unread: t.unread,
-  }));
+  const threads = rows
+    .map((t) => ({
+      id: t.id,
+      name: handleFor(t.other),
+      avatar: t.other.avatar,
+      preview: t.preview,
+      at: t.lastMessageAt,
+      unread: t.unread,
+      isBot: t.other.id === bot.id,
+    }))
+    .sort((a, b) => Number(b.isBot) - Number(a.isBot));
   return Response.json({ threads });
 }
 

@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#060506">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#060506"/>
+    <circle cx="600" cy="360" r="150" fill="none" stroke="#C2143B" stroke-width="26"/>
+    <path d="M600 210 L600 510 M450 360 L750 360" stroke="#C2143B" stroke-width="26" stroke-linecap="round"/>
+    <text x="600" y="650" font-family="Geist, sans-serif" font-size="96" font-weight="700" letter-spacing="18" fill="#F5F2F3" text-anchor="middle">VEIL</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0}
+  .veil{
+    --bg:#121012;--surface:#1A171A;--surface-2:#211D21;--surface-3:#2A252A;
+    --hairline:rgba(255,255,255,.08);--hairline-2:rgba(255,255,255,.14);
+    --primary:#C2143B;--primary-hover:#D81B47;--glow:rgba(194,20,59,.45);--tint:rgba(194,20,59,.12);
+    --text:#F5F2F3;--muted:#A8A0A4;--faint:#6E666B;
+    --success:#34D399;--gold:#E8B339;
+  }
+  .veil.light{
+    --bg:#FFFFFF;--surface:#FFFFFF;--surface-2:#FAFAF9;--surface-3:#F2F0F1;
+    --hairline:rgba(0,0,0,.08);--hairline-2:rgba(0,0,0,.14);
+    --primary:#B01237;--glow:rgba(176,18,55,.28);--tint:rgba(176,18,55,.10);
+    --text:#1A1718;--muted:#5C5559;--faint:#8A8287;
+    --success:#15A06B;--gold:#B8860B;
+  }
+  .veil *::-webkit-scrollbar{width:0;height:0}
+  .veil *{scrollbar-width:none}
+  @keyframes vspin{to{transform:rotate(360deg)}}
+  @keyframes vshimmer{0%{transform:translateX(-130%) skewX(-14deg);opacity:0}28%{opacity:.85}100%{transform:translateX(135%) skewX(-14deg);opacity:0}}
+  @keyframes vspring{0%{transform:translateY(12px) scale(.92);opacity:0}58%{transform:translateY(-3px) scale(1.03);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
+  @keyframes vpulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.55)}70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
+  @keyframes vglow{0%,100%{box-shadow:0 8px 26px var(--glow)}50%{box-shadow:0 10px 40px var(--glow)}}
+  @keyframes vfade{from{opacity:0}to{opacity:1}}
+  @keyframes vrise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes vdrawer{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  @keyframes vscrim{from{opacity:0}to{opacity:1}}
+  @keyframes vlikepop{0%{transform:scale(1)}28%{transform:scale(.78)}58%{transform:scale(1.28)}100%{transform:scale(1)}}
+  @keyframes vsavepop{0%{transform:scale(1)}38%{transform:scale(.76) translateY(-2px)}68%{transform:scale(1.2)}100%{transform:scale(1)}}
+  @keyframes vburst{0%{transform:scale(.2) rotate(-14deg);opacity:0}22%{transform:scale(1.18) rotate(2deg);opacity:1}64%{transform:scale(.98);opacity:.95}100%{transform:scale(1.12);opacity:0}}
+  @keyframes vbalbump{0%{transform:scale(1)}45%{transform:scale(1.14)}100%{transform:scale(1)}}
+  @keyframes vcoin{0%{transform:translateY(8px) scale(.5);opacity:0}25%{opacity:1}100%{transform:translateY(-104px) scale(1);opacity:0}}
+  @keyframes vsheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#060506;display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Geist',-apple-system,BlinkMacSystemFont,sans-serif">
+<div class="veil {{ themeClass }}" style="position:relative;width:390px;height:844px;background:var(--bg);border-radius:46px;overflow:hidden;box-shadow:0 40px 110px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.05);color:var(--text)">
+
+  <!-- ===== ONBOARDING / LOGIN ===== -->
+  <div style="position:absolute;inset:0;display:{{ dOnb }};flex-direction:column;overflow-y:auto;background:radial-gradient(120% 60% at 50% -8%, var(--tint), transparent 60%), var(--bg)">
+    <div style="padding:56px 28px 40px;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:24px">
+        <div style="width:34px;height:34px;border-radius:50%;background:conic-gradient(from 215deg,var(--primary),#7a0c24 55%,var(--primary));box-shadow:0 0 18px var(--glow)"></div>
+        <span style="font-size:25px;font-weight:700;letter-spacing:.16em;padding-left:.04em">VEIL</span>
+      </div>
+
+      <h1 style="font-size:29px;line-height:1.14;font-weight:700;letter-spacing:-.02em;margin:0 0 30px;max-width:330px">Log in to support your favorite creators</h1>
+
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:13px">Log in</div>
+
+      <input value="{{ email }}" onChange="{{ onEmail }}" placeholder="Email" type="email" autoComplete="email" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--tint)" style="width:100%;height:54px;padding:0 18px;border-radius:14px;border:1px solid var(--hairline-2);background:var(--surface-2);color:var(--text);font-family:inherit;font-size:16px;outline:none;transition:border-color .15s ease,box-shadow .15s ease;margin-bottom:14px">
+
+      <div style="position:relative;margin-bottom:18px">
+        <input value="{{ password }}" onChange="{{ onPassword }}" placeholder="Password" type="{{ pwType }}" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--tint)" style="width:100%;height:54px;padding:0 52px 0 18px;border-radius:14px;border:1px solid var(--hairline-2);background:var(--surface-2);color:var(--text);font-family:inherit;font-size:16px;outline:none;transition:border-color .15s ease,box-shadow .15s ease">
+        <button onClick="{{ togglePw }}" style="position:absolute;top:0;right:0;width:50px;height:54px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--faint);cursor:pointer">
+          <sc-if value="{{ showPw }}" hint-placeholder-val="{{ false }}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>
+          </sc-if>
+          <sc-if value="{{ hidePw }}" hint-placeholder-val="{{ true }}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </sc-if>
+        </button>
+      </div>
+
+      <button onClick="{{ doLogin }}" style-active="transform:scale(.985)" style="width:100%;height:54px;border:none;border-radius:9999px;background:{{ loginBg }};color:{{ loginColor }};font-family:inherit;font-size:15px;font-weight:700;letter-spacing:.04em;cursor:{{ loginCursor }};box-shadow:{{ loginShadow }};transition:transform .14s ease,background .2s ease,color .2s ease">LOG IN</button>
+
+      <p style="font-size:12.5px;line-height:1.55;color:var(--faint);margin:14px 0 0">By logging in and using Veil, you agree to our <span style="color:var(--primary)">Terms of Service</span> and <span style="color:var(--primary)">Privacy Policy</span>, and confirm that you are at least 18 years old.</p>
+
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:26px 0 22px;font-size:14px;font-weight:600;color:var(--primary)">
+        <span style="cursor:pointer">Forgot password?</span>
+        <span style="color:var(--faint)">·</span>
+        <span style="cursor:pointer">Sign up for Veil</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <button onClick="{{ goFeed }}" style-active="transform:scale(.985)" style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:52px;border:none;border-radius:9999px;background:var(--primary);color:#fff;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.04em;cursor:pointer;box-shadow:0 6px 22px var(--glow);transition:transform .14s ease">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:22px"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          SIGN IN WITH PASSKEY
+        </button>
+        <button onClick="{{ goFeed }}" style-active="transform:scale(.985)" style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:52px;border:1px solid var(--primary);border-radius:9999px;background:transparent;color:var(--text);font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:transform .14s ease">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="position:absolute;left:23px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          SIGN IN WITH X
+        </button>
+        <button onClick="{{ goFeed }}" style-active="transform:scale(.985)" style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:52px;border:1px solid var(--primary);border-radius:9999px;background:transparent;color:var(--text);font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:transform .14s ease">
+          <svg width="20" height="20" viewBox="0 0 24 24" style="position:absolute;left:22px"><path fill="#4285F4" d="M21.6 12.2c0-.6-.1-1.3-.2-1.9H12v3.6h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.2Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.7-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9l3.3-2.6Z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.6 9.4 5.9 12 5.9Z"/></svg>
+          SIGN IN WITH GOOGLE
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FEED ===== -->
+  <div style="position:absolute;inset:0;display:{{ dFeed }};flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 13px;border-bottom:1px solid var(--hairline);background:var(--surface);position:relative;z-index:2">
+      <div style="display:flex;align-items:center;gap:9px">
+        <div style="width:23px;height:23px;border-radius:50%;background:conic-gradient(from 215deg,var(--primary),#7a0c24 55%,var(--primary));box-shadow:0 0 12px var(--glow)"></div>
+        <span style="font-size:19px;font-weight:700;letter-spacing:.2em;padding-left:.1em">VEIL</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onClick="{{ goSearch }}" style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--muted);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" data-comment-anchor="1bf659765a-circle"/><path d="m21 21-4.3-4.3"/></svg></button>
+        <div style="display:flex;align-items:center;gap:6px;height:36px;padding:0 13px 0 11px;border-radius:9999px;background:var(--tint);border:1px solid rgba(194,20,59,.3)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="3"/><path d="M2 10h20"/><circle cx="17.5" cy="14.5" r="1.4" fill="var(--primary)" stroke="none"/></svg>
+          <span key="{{ balanceBumpKey }}" style="{{ balanceAnim }};font-family:'Geist Mono',monospace;font-size:13.5px;font-weight:600;color:var(--text);letter-spacing:-.01em">{{ balanceLabel }}</span>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px 14px 104px">
+      <div onClick="{{ goNew }}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface-2);border-radius:24px;margin-bottom:16px;cursor:pointer">
+        <div style="width:34px;height:34px;border-radius:50%;background:conic-gradient(from 120deg,#3a3640,#1c1a22)"></div>
+        <span style="color:var(--faint);font-size:15px">Share something private…</span>
+      </div>
+      <sc-for list="{{ posts }}" as="p" hint-placeholder-count="3">
+        <div style="background:var(--surface-2);border-radius:24px;overflow:hidden;margin-bottom:16px;box-shadow:0 8px 24px rgba(0,0,0,.32)">
+          <div style="display:flex;align-items:center;gap:11px;padding:14px 15px 12px">
+            <div style="position:relative;width:44px;height:44px;flex:none">
+              <div style="width:44px;height:44px;border-radius:50%;background:{{ p.avatar }}"></div>
+              <div style="position:absolute;right:-2px;bottom:-2px;width:17px;height:17px;border-radius:50%;background:var(--primary);border:2px solid var(--surface-2);display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:600;line-height:1.2">{{ p.name }}</div>
+              <div style="font-size:12.5px;color:var(--faint);line-height:1.3">{{ p.handle }} · {{ p.time }}</div>
+            </div>
+            <button style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--faint);cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+          </div>
+          <div style="padding:0 15px 13px;font-size:15.5px;line-height:1.46;color:var(--text)">{{ p.caption }}</div>
+          <div onDoubleClick="{{ p.onDoubleTap }}" style="position:relative;margin:0 12px;border-radius:16px;overflow:hidden;aspect-ratio:4/5">
+            <div style="position:absolute;inset:0;background-repeat:no-repeat;background-size:cover;{{ p.mediaStyle }}"></div>
+            <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,255,255,.07),transparent 38%)"></div>
+            <sc-if value="{{ p.isFree }}" hint-placeholder-val="{{ true }}">
+              <div style="position:absolute;top:12px;left:12px;padding:4px 11px;border-radius:9999px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);font-size:11px;font-weight:600;letter-spacing:.04em;color:#fff">FREE</div>
+            </sc-if>
+            <sc-if value="{{ p.showScrim }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(8,6,8,.46);padding:24px">
+                <div style="width:54px;height:54px;border-radius:50%;background:rgba(8,6,8,.55);border:1px solid var(--hairline-2);display:flex;align-items:center;justify-content:center;color:var(--text)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+                <button onClick="{{ p.onUnlock }}" style-active="transform:scale(.96)" style="display:flex;align-items:center;justify-content:center;gap:9px;min-width:188px;height:50px;padding:0 22px;border:none;border-radius:9999px;background:var(--primary);color:#fff;font-family:inherit;font-size:15.5px;font-weight:600;cursor:pointer;box-shadow:0 8px 30px var(--glow);transition:transform .14s ease">
+                  <sc-if value="{{ p.showLabel }}" hint-placeholder-val="{{ true }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    <span>Unlock · <span style="font-family:'Geist Mono',monospace;font-weight:500">{{ p.priceLabel }}</span></span>
+                  </sc-if>
+                  <sc-if value="{{ p.showSpinner }}" hint-placeholder-val="{{ false }}">
+                    <span style="width:17px;height:17px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:vspin .7s linear infinite"></span>
+                    <span>Unlocking…</span>
+                  </sc-if>
+                </button>
+                <div style="font-size:12px;color:rgba(245,242,243,.7)">Tap to unlock and reveal</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ p.isUnlocked }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none"><div style="position:absolute;top:0;bottom:0;width:55%;background:linear-gradient(105deg,transparent,rgba(216,27,71,.5) 45%,rgba(255,210,224,.85) 50%,rgba(216,27,71,.5) 55%,transparent);animation:vshimmer .85s cubic-bezier(.22,1,.36,1) .08s 1 both;mix-blend-mode:screen"></div></div>
+            </sc-if>
+            <sc-if value="{{ p.showBurst }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><svg width="104" height="104" viewBox="0 0 24 24" fill="#fff" style="animation:vburst .9s cubic-bezier(.22,1,.36,1) both;filter:drop-shadow(0 8px 24px rgba(0,0,0,.5))"><path d="M12 20s-7-4.6-9.4-9A4.9 4.9 0 0 1 12 6a4.9 4.9 0 0 1 9.4 5C19 15.4 12 20 12 20Z"/></svg></div>
+            </sc-if>
+          </div>
+          <div style="padding:13px 15px 14px">
+            <div style="display:flex;align-items:center;gap:18px;color:var(--muted)">
+              <button onClick="{{ p.onLike }}" style-active="transform:scale(.9)" style="display:flex;align-items:center;gap:7px;background:none;border:none;font-family:inherit;font-size:13.5px;cursor:pointer;padding:0;color:{{ p.likeColor }};transition:transform .12s ease"><svg width="23" height="23" viewBox="0 0 24 24" fill="{{ p.likeFill }}" stroke="{{ p.likeStroke }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="{{ p.likeAnim }}"><path d="M12 20s-7-4.6-9.4-9A4.9 4.9 0 0 1 12 6a4.9 4.9 0 0 1 9.4 5C19 15.4 12 20 12 20Z"/></svg><span>{{ p.likeCount }}</span></button>
+              <button onClick="{{ p.onComment }}" style-active="transform:scale(.9)" style="display:flex;align-items:center;gap:7px;background:none;border:none;color:var(--muted);font-family:inherit;font-size:13.5px;cursor:pointer;padding:0;transition:transform .12s ease"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6.1A8.4 8.4 0 1 1 21 11.5Z"/></svg><span>{{ p.commentCount }}</span></button>
+              <button onClick="{{ p.onTip }}" style-active="transform:scale(.9)" style="display:flex;align-items:center;gap:7px;background:none;border:none;color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.02em;cursor:pointer;padding:0;transition:transform .12s ease"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v9M14.3 9.4c0-1-1-1.7-2.3-1.7s-2.3.7-2.3 1.6.9 1.4 2.3 1.7 2.3.8 2.3 1.8-1 1.7-2.3 1.7-2.3-.7-2.3-1.6"/></svg><span>Tip</span></button>
+              <div style="flex:1"></div>
+              <button onClick="{{ p.onSave }}" style-active="transform:scale(.9)" style="display:flex;align-items:center;background:none;border:none;cursor:pointer;padding:0;color:{{ p.saveColor }};transition:transform .12s ease"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ p.saveFill }}" stroke="{{ p.saveStroke }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="{{ p.saveAnim }}"><path d="M6 3h12v18l-6-4-6 4Z"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ===== NOTIFICATIONS ===== -->
+  <div style="position:absolute;inset:0;display:{{ dNotif }};flex-direction:column">
+    <div style="display:flex;align-items:center;gap:14px;padding:18px 18px 13px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <button onClick="{{ goFeed }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      <span style="font-size:20px;font-weight:700;letter-spacing:.02em">Notifications</span>
+    </div>
+    <div style="display:flex;gap:9px;padding:14px;overflow-x:auto;border-bottom:1px solid var(--hairline)" data-comment-anchor="2d10178639-span">
+      <sc-for list="{{ notifChips }}" as="c" hint-placeholder-count="4">
+        <button onClick="{{ c.onClick }}" style-active="transform:scale(.95)" style="flex:none;padding:8px 16px;border-radius:9999px;font-family:inherit;font-size:13.5px;cursor:pointer;transition:transform .12s ease,background .15s ease,color .15s ease;{{ c.chipStyle }}">{{ c.label }}</button>
+      </sc-for>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:6px 14px 104px">
+      <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:13px;padding:14px 6px;border-bottom:1px solid var(--hairline)">
+          <div style="width:42px;height:42px;flex:none;border-radius:50%;background:{{ n.avatar }};display:flex;align-items:center;justify-content:center;color:var(--text)"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14.5px;line-height:1.4"><span style="font-weight:600">{{ n.who }}</span> <span style="color:var(--muted)">{{ n.what }}</span></div>
+            <div style="font-size:12px;color:var(--faint);margin-top:2px">{{ n.time }}</div>
+          </div>
+          <span style="flex:none;font-family:'Geist Mono',monospace;font-size:12.5px;color:{{ n.amtColor }}">{{ n.amt }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ===== NEW POST ===== -->
+  <div style="position:absolute;inset:0;display:{{ dNew }};flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 13px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button onClick="{{ goFeed }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+        <span style="font-size:20px;font-weight:700">New post</span>
+      </div>
+      <button onClick="{{ goNext }}" style-active="transform:scale(.97)" style="display:flex;align-items:center;justify-content:center;padding:9px 20px;border-radius:9999px;background:var(--primary);border:none;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px var(--glow);transition:transform .14s ease" data-comment-anchor="93fa731f7a-button">Next</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:18px 18px 104px;display:flex;flex-direction:column">
+      <div style="display:flex;gap:12px">
+        <div style="width:40px;height:40px;flex:none;border-radius:50%;background:conic-gradient(from 120deg,#3a3640,#1c1a22)"></div>
+        <div style="flex:1;color:var(--faint);font-size:17px;padding-top:8px">Write something worth unveiling…</div>
+      </div>
+      <input ref="{{ setMediaRef }}" onChange="{{ onMedia }}" type="file" accept="image/*,video/*" style="display:none">
+      <div onClick="{{ openMedia }}" style-active="transform:scale(.99);border-color:var(--primary)" style="margin-top:18px;flex:1;min-height:160px;border:1px dashed var(--hairline-2);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--faint);cursor:pointer;transition:transform .14s ease,border-color .15s ease" data-comment-anchor="395ea274d3-div">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="m21 15-5-5L5 21"/></svg>
+        <span style="font-size:13.5px;font-family:'Geist Mono',monospace" data-comment-anchor="cb94c0d726-span">add media</span>
+      </div>
+      <div style="margin-top:18px;display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--surface-2);border-radius:18px">
+        <div>
+          <div style="font-size:14.5px;font-weight:600">Unlock price</div>
+          <div style="font-size:12.5px;color:var(--faint);margin-top:2px">Charged once per unlock</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9999px;background:var(--surface-3);border:1px dashed var(--hairline-2);font-size:14px;font-weight:500;color:var(--faint)" data-comment-anchor="b613ef1c2d-div">Not set<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+      </div>
+      <div onClick="{{ toggleAutoBlur }}" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--surface-2);border-radius:18px;cursor:pointer">
+        <div>
+          <div style="font-size:14.5px;font-weight:600">Auto-blur</div>
+          <div style="font-size:12.5px;color:var(--faint);margin-top:2px">Detect &amp; blur sensitive regions</div>
+        </div>
+        <span style="width:42px;height:24px;flex:none;border-radius:9999px;background:{{ autoBlurBg }};position:relative;transition:background .2s ease"><span style="position:absolute;top:2px;left:{{ autoBlurX }};width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s ease;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MESSAGES ===== -->
+  <div style="position:absolute;inset:0;display:{{ dMsg }};flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 13px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button onClick="{{ goFeed }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+        <span style="font-size:20px;font-weight:700">Messages</span>
+      </div>
+      <button style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--muted);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <div style="display:flex;align-items:center;gap:9px;padding:14px 18px 10px">
+      <span style="padding:7px 15px;border-radius:9999px;background:var(--tint);border:1px solid rgba(194,20,59,.35);color:var(--text);font-size:13px;font-weight:600">All</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;line-height:1;padding:7px 15px;border-radius:9999px;background:var(--surface-2);color:var(--muted);font-size:13px;font-weight:500" data-comment-anchor="c291a54c4a-span"><span style="line-height:1">Unread</span><span style="font-family:'Geist Mono',monospace;color:var(--primary);line-height:1">3</span></span>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:4px 14px 104px">
+      <sc-for list="{{ threads }}" as="t" hint-placeholder-count="3">
+        <div onClick="{{ t.onOpen }}" style="display:flex;align-items:center;gap:13px;padding:14px 6px;border-bottom:1px solid var(--hairline);cursor:pointer">
+          <div style="width:50px;height:50px;flex:none;border-radius:50%;background:{{ t.avatar }}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px"><span style="font-size:15px;font-weight:600">{{ t.name }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="var(--primary)"/><path d="m8 12 3 3 5-6" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div style="font-size:13.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.preview }}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px">
+            <span style="font-size:12px;color:var(--faint)">{{ t.time }}</span>
+            <span style="width:9px;height:9px;border-radius:50%;background:var(--primary)"></span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ===== PROFILE ===== -->
+  <div style="position:absolute;inset:0;display:{{ dProf }};flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 13px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <span style="font-size:20px;font-weight:700">Profile</span>
+      <button onClick="{{ openDrawer }}" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--muted);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:20px 18px 104px">
+      <div style="display:flex;align-items:flex-end;gap:15px">
+        <div style="width:78px;height:78px;flex:none;border-radius:50%;background:conic-gradient(from 120deg,#3a3640,#1c1a22);box-shadow:0 0 0 3px var(--surface),0 0 0 4px var(--hairline-2)"></div>
+        <div style="flex:1;padding-bottom:4px" data-comment-anchor="df35eacfcf-div">
+          <div style="display:flex;align-items:center;gap:6px"><span style="font-size:20px;font-weight:700">Ash Kovač</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="var(--primary)"/><path d="m8 12 3 3 5-6" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div style="font-size:13.5px;color:var(--faint);margin-top:2px">@ashkovac</div>
+        </div>
+      </div>
+      <p style="font-size:14.5px;line-height:1.5;color:var(--muted);margin:14px 0 0">Late nights &amp; velvet light. New sets every week — subscribe for the full reveal. 🥂</p>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button style-active="transform:scale(.98)" style="flex:1;height:46px;border-radius:9999px;background:var(--surface-2);border:1px solid var(--hairline);color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:transform .14s ease">Edit profile</button>
+        <button style-active="transform:scale(.98)" style="flex:1;height:46px;border-radius:9999px;background:var(--surface-2);border:1px solid var(--hairline);color:var(--text);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:transform .14s ease">Share</button>
+      </div>
+      <div style="display:flex;margin-top:20px;padding:16px 0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline)">
+        <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700">148</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Posts</div></div>
+        <div style="flex:1;text-align:center;border-left:1px solid var(--hairline)"><div style="font-size:18px;font-weight:700">12.3k</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Fans</div></div>
+        <div style="flex:1;text-align:center;border-left:1px solid var(--hairline)"><div style="font-size:18px;font-weight:700">89.4k</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Likes</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:20px;padding-bottom:12px;border-bottom:1px solid var(--hairline)">
+        <div style="display:flex;align-items:center;gap:7px;color:var(--text);font-size:13px;font-weight:600"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Posts</div>
+        <div style="flex:1"></div>
+        <span style="font-family:'Geist Mono',monospace;font-size:12px;color:var(--faint)">148 · 9 locked</span>
+      </div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:2px" data-comment-anchor="90c6f61427-div">
+        <sc-for list="{{ galleryTiles }}" as="g" hint-placeholder-count="9">
+          <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:{{ g.grad }}">
+            <sc-if value="{{ g.locked }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:rgba(8,6,8,.42);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;color:rgba(245,242,243,.92)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DM CONVERSATION ===== -->
+  <div style="position:absolute;inset:0;display:{{ dDm }};flex-direction:column">
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 16px 12px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <button onClick="{{ goMsg }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      <div style="position:relative;width:40px;height:40px;flex:none">
+        <div style="width:40px;height:40px;border-radius:50%;background:{{ dmAvatar }}"></div>
+        <span style="position:absolute;right:0;bottom:0;width:11px;height:11px;border-radius:50%;background:var(--success);border:2px solid var(--surface)"></span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:5px"><span style="font-size:15.5px;font-weight:600">{{ dmName }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="var(--primary)"/><path d="m8 12 3 3 5-6" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="font-size:12px;color:var(--success);margin-top:1px">Active now</div>
+      </div>
+      <button style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--muted);cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:18px 14px;display:flex;flex-direction:column;gap:10px">
+      <div style="text-align:center;font-size:11px;color:var(--faint);margin-bottom:4px">Today</div>
+      <sc-for list="{{ dmMsgs }}" as="m" hint-placeholder-count="4">
+        <div style="display:flex;justify-content:{{ m.rowJustify }}">
+          <sc-if value="{{ m.isText }}" hint-placeholder-val="{{ true }}">
+            <div style="max-width:74%;padding:10px 14px;border-radius:20px;font-size:14.5px;line-height:1.4;background:{{ m.bubbleBg }};color:{{ m.bubbleColor }}">{{ m.text }}</div>
+          </sc-if>
+          <sc-if value="{{ m.isLocked }}" hint-placeholder-val="{{ false }}">
+            <div style="width:230px;border-radius:20px;overflow:hidden;background:var(--surface-2);border:1px solid var(--hairline)">
+              <div style="position:relative;aspect-ratio:4/5">
+                <div style="position:absolute;inset:0;background:radial-gradient(130% 120% at 30% 12%,#5a2738,#1f131a 56%,#0c0a0c);filter:blur(15px);transform:scale(1.1)"></div>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(8,6,8,.5)">
+                  <div style="width:46px;height:46px;border-radius:50%;background:rgba(8,6,8,.55);border:1px solid var(--hairline-2);display:flex;align-items:center;justify-content:center;color:#fff"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+                  <button style="display:flex;align-items:center;gap:7px;height:42px;padding:0 18px;border:none;border-radius:9999px;background:var(--primary);color:#fff;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:0 6px 20px var(--glow)">Unlock · <span style="font-family:'Geist Mono',monospace;font-weight:500">{{ m.priceLabel }}</span></button>
+                </div>
+              </div>
+              <div style="padding:10px 14px;font-size:13.5px;color:var(--text)">{{ m.caption }}</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px 22px;border-top:1px solid var(--hairline);background:var(--surface)">
+      <button style="width:38px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--muted);cursor:pointer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="m21 15-5-5L5 21"/></svg></button>
+      <div style="flex:1;height:42px;border-radius:9999px;background:var(--surface-2);border:1px solid var(--hairline);display:flex;align-items:center;padding:0 16px;color:var(--faint);font-size:14px">Send a message…</div>
+      <button style="width:42px;height:42px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--primary);border:none;border-radius:50%;color:#fff;cursor:pointer;box-shadow:0 6px 18px var(--glow)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4Z"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ===== SEARCH ===== -->
+  <div style="position:absolute;inset:0;display:{{ dSearch }};flex-direction:column">
+    <div style="display:flex;align-items:center;gap:11px;padding:16px 16px 13px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <button onClick="{{ goFeed }}" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      <div style="flex:1;display:flex;align-items:center;gap:10px;height:44px;padding:0 16px;border-radius:9999px;background:var(--surface-2);border:1px solid var(--hairline)">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search creators, sets, tags…" style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:15px">
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:18px 16px 104px">
+      <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:600;margin-bottom:11px">Recent &amp; trending</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+        <sc-for list="{{ searchChips }}" as="ch" hint-placeholder-count="6">
+          <span style="display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9999px;background:var(--surface-2);border:1px solid var(--hairline);color:var(--muted);font-size:13.5px;cursor:pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>{{ ch }}</span>
+        </sc-for>
+      </div>
+      <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:600;margin-bottom:6px">Top creators</div>
+      <sc-for list="{{ searchCreators }}" as="cr" hint-placeholder-count="3">
+        <div onClick="{{ cr.onOpen }}" style="display:flex;align-items:center;gap:13px;padding:13px 4px;border-bottom:1px solid var(--hairline);cursor:pointer">
+          <div style="width:46px;height:46px;flex:none;border-radius:50%;background:{{ cr.avatar }}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:5px"><span style="font-size:15px;font-weight:600">{{ cr.name }}</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" fill="var(--primary)"/><path d="m8 12 3 3 5-6" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div style="font-size:12.5px;color:var(--faint);margin-top:2px">{{ cr.handle }} · {{ cr.meta }}</div>
+          </div>
+          <span style="flex:none;padding:8px 16px;border-radius:9999px;background:var(--tint);border:1px solid rgba(194,20,59,.3);color:var(--primary);font-size:13px;font-weight:600">Follow</span>
+        </div>
+      </sc-for>
+      <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:22px 0 11px">Explore</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">
+        <sc-for list="{{ galleryTiles }}" as="g" hint-placeholder-count="9">
+          <div style="position:relative;aspect-ratio:1/1;border-radius:6px;overflow:hidden;background:{{ g.grad }}">
+            <sc-if value="{{ g.locked }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:rgba(8,6,8,.4);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:rgba(245,242,243,.9)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== BLUR REVIEW ===== -->
+  <div style="position:absolute;inset:0;display:{{ dReview }};flex-direction:column;background:var(--bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 13px;border-bottom:1px solid var(--hairline);background:var(--surface)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button onClick="{{ backFromReview }}" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+        <span style="font-size:20px;font-weight:700" data-comment-anchor="b50fb1645c-div">New post</span>
+      </div>
+      <button onClick="{{ approveReview }}" style="display:flex;align-items:center;justify-content:center;padding:9px 20px;border-radius:9999px;background:var(--primary);border:none;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px var(--glow)">Publish</button>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:16px 16px 28px">
+      <!-- Blurred preview with detected-region overlay -->
+      <div style="position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/5;background:var(--surface-2);border:1px solid var(--hairline)">
+        <div style="position:absolute;inset:0;background:radial-gradient(130% 120% at 32% 14%,#5a2738,#1f131a 56%,#0c0a0c);filter:{{ reviewBlur }};transform:scale(1.12);transition:filter .5s ease"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,255,255,.06),transparent 40%)"></div>
+        <sc-if value="{{ showRegionOverlay }}" hint-placeholder-val="{{ false }}">
+          <sc-for list="{{ reviewRegions }}" as="r" hint-placeholder-count="2">
+            <div style="position:absolute;left:{{ r.left }};top:{{ r.top }};width:{{ r.width }};height:{{ r.height }};border:2px solid var(--primary);border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.45);animation:vfade .4s ease both">
+              <span style="position:absolute;top:-19px;left:-1px;display:flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:var(--primary);color:#fff;font-size:10px;font-weight:700;font-family:'Geist Mono',monospace;white-space:nowrap">{{ r.label }} {{ r.conf }}</span>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ reviewProcessing }}" hint-placeholder-val="{{ true }}">
+          <div style="position:absolute;left:12px;bottom:12px;display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:9999px;background:rgba(8,6,8,.6);backdrop-filter:blur(8px);color:#fff;font-size:12.5px;font-weight:600"><span style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.32);border-top-color:#fff;animation:vspin .7s linear infinite"></span>Auto-blurring…</div>
+        </sc-if>
+        <sc-if value="{{ reviewPublished }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(8,6,8,.5)">
+            <div style="width:60px;height:60px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;animation:vspring .5s cubic-bezier(.22,1,.36,1) both"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#06140d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div style="font-size:15px;font-weight:700;color:#fff">Published &amp; live</div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- Live stepper -->
+      <div style="margin-top:16px;padding:18px 16px;border-radius:18px;background:var(--surface-2);border:1px solid var(--hairline)">
+        <sc-for list="{{ reviewStepVals }}" as="st" hint-placeholder-count="3">
+          <div style="display:flex;align-items:stretch;gap:13px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <span style="width:26px;height:26px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ st.dotBg }};border:{{ st.dotBorder }}">
+                <sc-if value="{{ st.isDone }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></sc-if>
+                <sc-if value="{{ st.isActive }}" hint-placeholder-val="{{ true }}"><span style="width:12px;height:12px;border-radius:50%;border:2px solid rgba(194,20,59,.3);border-top-color:var(--primary);animation:vspin .7s linear infinite"></span></sc-if>
+                <sc-if value="{{ st.isPending }}" hint-placeholder-val="{{ false }}"><span style="width:7px;height:7px;border-radius:50%;background:var(--faint)"></span></sc-if>
+              </span>
+              <sc-if value="{{ st.notLast }}" hint-placeholder-val="{{ true }}"><span style="width:2px;flex:1;min-height:14px;margin:4px 0;background:{{ st.connBg }}"></span></sc-if>
+            </div>
+            <span style="padding:2px 0 12px;font-size:14px;color:{{ st.labelColor }};font-weight:{{ st.labelWeight }}">{{ st.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Actions -->
+      <sc-if value="{{ reviewReady }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:18px;animation:vrise .35s ease both">
+          <button onClick="{{ approveReview }}" style-active="transform:scale(.985)" style="display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:54px;border:none;border-radius:9999px;background:var(--primary);color:#fff;font-family:inherit;font-size:15.5px;font-weight:700;cursor:pointer;box-shadow:0 8px 28px var(--glow);transition:transform .14s ease"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5Z"/><path d="m9 12 2 2 4-4"/></svg>Approve &amp; publish</button>
+          <div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-top:2px;font-size:12px;color:var(--faint)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Nothing is public until you approve</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ reviewProcessing }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ backFromReview }}" style-active="transform:scale(.98)" style="margin-top:18px;width:100%;height:50px;border-radius:9999px;background:var(--surface-2);border:1px solid var(--hairline);color:var(--muted);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:transform .14s ease">Cancel</button>
+      </sc-if>
+      <sc-if value="{{ reviewPublishing }}" hint-placeholder-val="{{ false }}">
+        <button style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:54px;border:none;border-radius:9999px;background:var(--primary);color:#fff;font-family:inherit;font-size:15.5px;font-weight:700;box-shadow:0 8px 28px var(--glow)"><span style="width:17px;height:17px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:vspin .7s linear infinite"></span>Publishing…</button>
+      </sc-if>
+      <sc-if value="{{ reviewPublished }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:18px;animation:vrise .35s ease both">
+          <div style="display:flex;align-items:center;gap:9px;padding:14px 16px;border-radius:14px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:var(--success);font-size:13.5px;font-weight:600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>Published — your blurred preview is live in the feed.</div>
+          <button onClick="{{ goFeed }}" style-active="transform:scale(.985)" style="margin-top:12px;width:100%;height:52px;border:none;border-radius:9999px;background:var(--primary);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 8px 26px var(--glow);transition:transform .14s ease">View in feed</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ===== COMMENTS (Instagram-style) ===== -->
+  <div style="position:absolute;inset:0;display:{{ dComments }};flex-direction:column;background:var(--bg);animation:vsheet .3s cubic-bezier(.22,1,.36,1) both">
+    <div style="display:flex;align-items:center;justify-content:center;padding:13px 16px 11px;border-bottom:1px solid var(--hairline);position:relative;background:var(--surface)">
+      <div style="position:absolute;top:7px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:var(--hairline-2)"></div>
+      <span style="font-size:16px;font-weight:700;letter-spacing:.01em;margin-top:4px">Comments</span>
+      <button onClick="{{ backFromComments }}" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--muted);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div style="flex:1;overflow-y:auto">
+      <!-- original caption as first row -->
+      <div style="display:flex;gap:11px;padding:15px 16px 13px;border-bottom:1px solid var(--hairline)">
+        <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;background:{{ cmtAvatar }}"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;line-height:1.45;color:var(--text)"><span style="font-weight:600">{{ cmtHandle }}</span> {{ cmtCaption }}</div>
+          <div style="font-size:12px;color:var(--faint);margin-top:5px">{{ cmtTime }}</div>
+        </div>
+      </div>
+      <sc-for list="{{ comments }}" as="c" hint-placeholder-count="5">
+        <div style="display:flex;gap:11px;padding:13px 16px">
+          <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;background:{{ c.avatar }}"></div>
+          <div style="flex:1;min-width:0">
+            <sc-if value="{{ c.pinned }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;color:var(--faint);font-size:11px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2 9 7H5l-1 5 4 1v9l2-5 6-6 1-4-3-3 2-2Z"/></svg><span>Pinned by creator</span></div>
+            </sc-if>
+            <div style="font-size:14px;line-height:1.45;color:var(--text)"><span style="font-weight:600">{{ c.who }}</span> {{ c.text }}</div>
+            <div style="display:flex;align-items:center;gap:16px;margin-top:6px;color:var(--faint);font-size:12px;font-weight:600">
+              <span>{{ c.time }}</span>
+              <span>{{ c.likeCount }} likes</span>
+              <button style="background:none;border:none;color:var(--faint);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:0">Reply</button>
+            </div>
+            <sc-if value="{{ c.hasReply }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:9px;margin-top:11px">
+                <div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;background:conic-gradient(from 200deg,#5a2333,#2a1620,#5a2333)"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13.5px;line-height:1.45;color:var(--text)"><span style="font-weight:600">{{ c.replyWho }}</span> {{ c.replyText }}</div>
+                  <div style="color:var(--faint);font-size:12px;font-weight:600;margin-top:5px">{{ c.replyTime }}</div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <button onClick="{{ c.onLike }}" style-active="transform:scale(.85)" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:2px 0;align-self:flex-start;margin-top:1px;transition:transform .12s ease"><svg width="17" height="17" viewBox="0 0 24 24" fill="{{ c.heartFill }}" stroke="{{ c.heartStroke }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{ c.heartAnim }}"><path d="M12 20s-7-4.6-9.4-9A4.9 4.9 0 0 1 12 6a4.9 4.9 0 0 1 9.4 5C19 15.4 12 20 12 20Z"/></svg></button>
+        </div>
+      </sc-for>
+      <div style="height:8px"></div>
+    </div>
+    <!-- emoji quick reacts -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 18px 7px;border-top:1px solid var(--hairline)">
+      <sc-for list="{{ commentReacts }}" as="e" hint-placeholder-count="6">
+        <span style="font-size:23px;line-height:1;cursor:pointer">{{ e }}</span>
+      </sc-for>
+    </div>
+    <!-- composer -->
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 14px 24px;border-top:1px solid var(--hairline);background:var(--surface)">
+      <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#4a2030,#1c1117)"></div>
+      <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--hairline);border-radius:9999px;padding:7px 7px 7px 16px">
+        <input value="{{ commentText }}" onInput="{{ onCommentText }}" placeholder="Add a comment…" style="flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:14px" />
+        <button style="height:30px;padding:0 14px;border:none;border-radius:9999px;background:{{ commentPostBg }};color:{{ commentPostColor }};font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;transition:background .15s ease">Post</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TIP SCREEN ===== -->
+  <div style="position:absolute;inset:0;display:{{ dTip }};flex-direction:column;background:radial-gradient(120% 55% at 50% -6%, var(--tint), transparent 58%), var(--bg);animation:vsheet .3s cubic-bezier(.22,1,.36,1) both">
+    <div style="display:flex;align-items:center;gap:13px;padding:16px 16px 13px;border-bottom:1px solid var(--hairline)">
+      <button onClick="{{ backFromTip }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--text);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      <span style="font-size:18px;font-weight:700;letter-spacing:.02em">Send a tip</span>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:26px 22px 20px;display:flex;flex-direction:column;align-items:center">
+      <div style="width:74px;height:74px;border-radius:50%;background:{{ tipAvatar }};box-shadow:0 0 0 1px var(--hairline-2),0 12px 34px rgba(0,0,0,.4)"></div>
+      <div style="margin-top:13px;font-size:18px;font-weight:700">{{ tipName }}</div>
+      <div style="font-size:13px;color:var(--faint);margin-top:2px">{{ tipHandle }}</div>
+
+      <!-- big amount + coin animation -->
+      <div style="position:relative;margin:26px 0 22px;display:flex;align-items:baseline;gap:2px">
+        <sc-if value="{{ tipSent }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:26px;animation:vcoin 1s cubic-bezier(.22,1,.36,1) both;pointer-events:none">🪙</div>
+        </sc-if>
+        <span style="font-size:34px;font-weight:700;color:var(--primary);font-family:'Geist Mono',monospace;align-self:flex-start;margin-top:6px">$</span>
+        <span style="font-size:72px;font-weight:700;letter-spacing:-.03em;line-height:1;font-family:'Geist Mono',monospace">{{ tipAmountLabel }}</span>
+      </div>
+
+      <!-- preset chips -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:320px">
+        <sc-for list="{{ tipAmounts }}" as="t" hint-placeholder-count="6">
+          <button onClick="{{ t.onPick }}" style-active="transform:scale(.95)" style="height:50px;border-radius:14px;font-family:'Geist Mono',monospace;font-size:17px;cursor:pointer;transition:transform .12s ease,background .15s ease;{{ t.chipStyle }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <!-- message -->
+      <input value="{{ tipMsg }}" onInput="{{ onTipMsg }}" placeholder="Add a message (optional)" style="margin-top:18px;width:100%;max-width:320px;background:var(--surface-2);border:1px solid var(--hairline);border-radius:14px;padding:14px 16px;color:var(--text);font-family:inherit;font-size:14px;outline:none" />
+
+      <div style="display:flex;align-items:center;gap:7px;margin-top:16px;color:var(--faint);font-size:12.5px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="3"/><path d="M2 10h20"/></svg>
+        <span>Wallet balance · <span style="font-family:'Geist Mono',monospace;color:var(--muted)">{{ tipBalanceLabel }}</span></span>
+      </div>
+      <sc-if value="{{ tipTooLow }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:8px;color:var(--primary);font-size:12.5px;font-weight:600">Not enough balance for this tip</div>
+      </sc-if>
+    </div>
+
+    <div style="padding:12px 18px 28px;border-top:1px solid var(--hairline)">
+      <button onClick="{{ sendTip }}" style-active="transform:scale(.985)" style="width:100%;height:54px;border:none;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:9px;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;transition:transform .12s ease;background:{{ tipBtnBg }};color:{{ tipBtnColor }};box-shadow:{{ tipBtnShadow }}">
+        <sc-if value="{{ tipIdle }}" hint-placeholder-val="{{ true }}">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4Z"/></svg>
+          <span>{{ tipSendLabel }}</span>
+        </sc-if>
+        <sc-if value="{{ tipSending }}" hint-placeholder-val="{{ false }}">
+          <span style="width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:vspin .7s linear infinite"></span>
+          <span>Sending…</span>
+        </sc-if>
+        <sc-if value="{{ tipSent }}" hint-placeholder-val="{{ false }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="animation:vlikepop .5s cubic-bezier(.22,1,.36,1)"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>{{ tipSentLabel }}</span>
+        </sc-if>
+      </button>
+    </div>
+  </div>
+
+  <!--MORE_SCREENS-->
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <div style="position:absolute;left:0;right:0;bottom:0;display:{{ navDisp }};align-items:center;justify-content:space-around;height:84px;padding:8px 16px 22px;background:var(--surface);border-top:1px solid var(--hairline);z-index:30">
+    <button onClick="{{ goFeed }}" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:{{ cFeed }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.7V20h5v-6h4v6h5V9.7"/></svg></button>
+    <button onClick="{{ goNotif }}" style="position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:{{ cNotif }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span style="position:absolute;top:5px;right:5px;min-width:17px;height:17px;padding:0 4px;border-radius:9999px;background:var(--primary);color:#fff;font-size:10px;font-weight:700;font-family:'Geist Mono',monospace;display:flex;align-items:center;justify-content:center">12</span></button>
+    <button onClick="{{ goNew }}" style="width:50px;height:42px;display:flex;align-items:center;justify-content:center;background:var(--primary);border:none;border-radius:14px;cursor:pointer;color:#fff;box-shadow:0 6px 20px var(--glow)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button onClick="{{ goMsg }}" style="position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:{{ cMsg }}"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L4 20.5l1.4-4.8A8.4 8.4 0 1 1 21 11.5Z"/></svg><span style="position:absolute;top:5px;right:6px;min-width:17px;height:17px;padding:0 4px;border-radius:9999px;background:var(--primary);color:#fff;font-size:10px;font-weight:700;font-family:'Geist Mono',monospace;display:flex;align-items:center;justify-content:center">3</span></button>
+    <button onClick="{{ goProf }}" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer"><span style="width:30px;height:30px;border-radius:50%;background:conic-gradient(from 120deg,#3a3640,#1c1a22);box-shadow:0 0 0 2px {{ cProf }}"></span></button>
+  </div>
+
+  <!-- ===== SETTINGS DRAWER ===== -->
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDrawer }}" style="position:absolute;inset:0;background:rgba(4,3,5,.55);z-index:40;animation:vscrim .2s ease both"></div>
+    <div style="position:absolute;top:0;right:0;bottom:0;width:328px;background:var(--surface);z-index:41;display:flex;flex-direction:column;animation:vdrawer .24s cubic-bezier(.22,1,.36,1) both;box-shadow:-20px 0 60px rgba(0,0,0,.5)">
+      <div style="padding:22px 20px 18px;border-bottom:1px solid var(--hairline)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div style="position:relative;width:52px;height:52px">
+            <div style="width:52px;height:52px;border-radius:50%;background:conic-gradient(from 120deg,#3a3640,#1c1a22)"></div>
+            <span style="position:absolute;right:0;bottom:0;width:13px;height:13px;border-radius:50%;background:var(--success);border:2px solid var(--surface)"></span>
+          </div>
+          <button onClick="{{ closeDrawer }}" style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--muted);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div style="font-size:18px;font-weight:700;margin-top:12px">Ash Kovač</div>
+        <div style="font-size:13px;color:var(--faint);margin-top:2px">@ashkovac</div>
+        <div style="display:flex;gap:18px;margin-top:12px;font-size:13.5px"><span><b style="font-weight:700">0</b> <span style="color:var(--muted)">Fans</span></span><span><b style="font-weight:700">3</b> <span style="color:var(--muted)">Following</span></span></div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:8px 0">
+        <div onClick="{{ goProf }}" style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span style="font-size:15px;font-weight:500">My profile</span></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7.5l9 4.5 9-4.5Z"/><path d="m3 12 9 4.5L21 12"/></svg><span style="font-size:15px;font-weight:500">Collections</span></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span style="font-size:15px;font-weight:500">Settings</span></div>
+        <div style="height:1px;background:var(--hairline);margin:8px 22px"></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg><span style="font-size:15px;font-weight:500">Your cards <span style="color:var(--faint);font-weight:400">(to subscribe)</span></span></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-4 8 4v13"/><path d="M9 21v-6h6v6"/></svg><span style="font-size:15px;font-weight:500">Become a creator <span style="color:var(--faint);font-weight:400">(to earn)</span></span></div>
+        <div style="height:1px;background:var(--hairline);margin:8px 22px"></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.3 2-2.3 3.2"/><circle cx="12" cy="17" r=".5" fill="var(--muted)"/></svg><span style="font-size:15px;font-weight:500">Help and support</span></div>
+        <div onClick="{{ toggleTheme }}" style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+          <span style="font-size:15px;font-weight:500;flex:1">{{ themeLabel }}</span>
+          <span style="width:42px;height:24px;border-radius:9999px;background:{{ toggleBg }};position:relative;transition:background .2s ease"><span style="position:absolute;top:2px;left:{{ toggleX }};width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s ease;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.6 2.4 15.4 0 18M12 3c-2.4 2.6-2.4 15.4 0 18"/></svg><span style="font-size:15px;font-weight:500;flex:1">English</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div style="height:1px;background:var(--hairline);margin:8px 22px"></div>
+        <div onClick="{{ goOnb }}" style="display:flex;align-items:center;gap:14px;padding:13px 22px;cursor:pointer"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8"/><path d="m17 16 4-4-4-4M21 12H10"/></svg><span style="font-size:15px;font-weight:500">Log out</span></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!--DRAWER-->
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844}}">
+class Component extends DCLogic {
+  state = { screen:'onboarding', drawerOpen:false, theme:'dark', unlocked:{}, email:'', password:'', showPw:false, notifFilter:'All', reviewStage:'idle', reviewType:'image', search:'', autoBlur:false,
+    balance:42.50, balanceBump:0, liked:{}, saved:{}, burst:{}, commentLikes:{}, commentText:'',
+    tipPost:null, tipAmount:5, tipMsg:'', tipStage:'idle', activePost:null };
+
+  onEmail = (e) => this.setState({ email: e.target.value });
+  onPassword = (e) => this.setState({ password: e.target.value });
+  togglePw = () => this.setState(s => ({ showPw: !s.showPw }));
+  onSearch = (e) => this.setState({ search: e.target.value });
+
+  toggleLike = (id) => {
+    if (navigator.vibrate) navigator.vibrate(6);
+    this.setState(s => ({ liked: { ...s.liked, [id]: !s.liked[id] } }));
+  };
+  doubleTapLike = (id) => {
+    if (navigator.vibrate) navigator.vibrate([5, 30, 8]);
+    this._bt = (this._bt || 0) + 1;
+    const token = this._bt;
+    this.setState(s => ({ liked: { ...s.liked, [id]: true }, burst: { ...s.burst, [id]: true } }));
+    setTimeout(() => {
+      if (token !== this._bt) return;
+      this.setState(s => ({ burst: { ...s.burst, [id]: false } }));
+    }, 900);
+  };
+  toggleSave = (id) => {
+    if (navigator.vibrate) navigator.vibrate(6);
+    this.setState(s => ({ saved: { ...s.saved, [id]: !s.saved[id] } }));
+  };
+  toggleCommentLike = (id) => this.setState(s => ({ commentLikes: { ...s.commentLikes, [id]: !s.commentLikes[id] } }));
+  onCommentText = (e) => this.setState({ commentText: e.target.value });
+  openComments = (post) => this.setState({ screen:'comments', activePost: post, drawerOpen:false });
+
+  openTip = (post) => this.setState({ screen:'tip', tipPost: post, tipAmount: 5, tipMsg:'', tipStage:'idle', drawerOpen:false });
+  setTip = (amt) => { if (this.state.tipStage !== 'idle') return; this.setState({ tipAmount: amt }); if (navigator.vibrate) navigator.vibrate(4); };
+  onTipMsg = (e) => this.setState({ tipMsg: e.target.value });
+  sendTip = () => {
+    if (this.state.tipStage !== 'idle') return;
+    if (this.state.tipAmount > this.state.balance) return;
+    this.setState({ tipStage:'sending' });
+    if (navigator.vibrate) navigator.vibrate(8);
+    setTimeout(() => {
+      this.setState(s => ({ tipStage:'sent', balance: Math.max(0, +(s.balance - s.tipAmount).toFixed(2)), balanceBump: s.balanceBump + 1 }));
+      if (navigator.vibrate) navigator.vibrate([6, 40, 12]);
+    }, 1050);
+  };
+
+  go = (screen) => this.setState({ screen, drawerOpen:false });
+
+  // --- Auto-blur review pipeline (mirrors lib/blur state machine) ---
+  onMedia = (e) => {
+    const f = e.target && e.target.files && e.target.files[0];
+    const isVid = f && f.type && f.type.indexOf('video') === 0;
+    if (this.state.autoBlur) this.startReview(isVid ? 'video' : 'image');
+    if (e.target) e.target.value = '';
+  };
+  toggleAutoBlur = () => this.setState(s => ({ autoBlur: !s.autoBlur }));
+  goNext = () => {
+    if (this.state.autoBlur) { this.startReview('image'); return; }
+    this.setState({ screen:'review', reviewStage:'ready_for_review', reviewType:'image', drawerOpen:false });
+    if (navigator.vibrate) navigator.vibrate(6);
+  };
+
+  startReview = (mediaType) => {
+    this._rv = (this._rv || 0) + 1;
+    const token = this._rv;
+    const steps = mediaType === 'video'
+      ? ['detecting', 'tracking', 'compositing', 'ready_for_review']
+      : ['detecting', 'compositing', 'ready_for_review'];
+    this.setState({ screen:'review', reviewType: mediaType, reviewStage:'detecting', drawerOpen:false });
+    if (navigator.vibrate) navigator.vibrate(6);
+    steps.forEach((st, idx) => {
+      if (idx === 0) return;
+      setTimeout(() => {
+        if (token !== this._rv) return;
+        this.setState({ reviewStage: st });
+        if (st === 'ready_for_review' && navigator.vibrate) navigator.vibrate([5, 35, 10]);
+      }, idx * 1350);
+    });
+  };
+
+  approveReview = () => {
+    this.setState({ reviewStage:'publishing' });
+    if (navigator.vibrate) navigator.vibrate(8);
+    setTimeout(() => this.setState({ reviewStage:'published' }), 900);
+  };
+  rerunReview = () => this.startReview(this.state.reviewType);
+  openDrawer = () => this.setState({ drawerOpen:true });
+  closeDrawer = () => this.setState({ drawerOpen:false });
+  toggleTheme = () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' }));
+
+  unlock = (id) => {
+    if (this.state.unlocked[id]) return;
+    this.setState(s => ({ unlocked: { ...s.unlocked, [id]: { status:'paying' } } }));
+    if (navigator.vibrate) navigator.vibrate(8);
+    setTimeout(() => {
+      this.setState(s => ({ unlocked: { ...s.unlocked, [id]: { status:'done' } } }));
+      if (navigator.vibrate) navigator.vibrate([6, 40, 12]);
+    }, 640);
+  };
+
+  renderVals() {
+    const POSTS = [
+      { id:'p1', name:'Velour', handle:'@velour.atelier', time:'2h', price:'0.02', free:false, likes:214,
+        caption:'Behind the velvet rope tonight — lifted the veil just for you.',
+        avatar:'conic-gradient(from 200deg,#5a2333,#2a1620,#5a2333)',
+        grad:'radial-gradient(130% 120% at 30% 12%,#5a2738,#1f131a 56%,#0c0a0c)' },
+      { id:'p2', name:'Noir Studio', handle:'@noir.studio', time:'5h', price:'0.00', free:true, likes:1243,
+        caption:'Free drop — golden hour from the rooftop set. Full series for members.',
+        avatar:'linear-gradient(135deg,#3a3640,#1c1a22)',
+        grad:'linear-gradient(150deg,#2c2832 0%,#191720 55%,#12101a 100%)' },
+      { id:'p3', name:'Maison Rouge', handle:'@maison.rouge', time:'1d', price:'0.05', free:false, likes:389,
+        caption:'Roll the dice. One tap and it\u2019s yours.',
+        avatar:'conic-gradient(from 160deg,#6a1d2e,#2a121a,#6a1d2e)',
+        grad:'radial-gradient(130% 120% at 72% 22%,#6a2031,#241420 55%,#0c0a0c)' },
+    ];
+    const fmtK = (n) => n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,'') + 'k' : ('' + n);
+    const u = this.state.unlocked;
+    const trans = 'filter .62s cubic-bezier(.22,1,.36,1), transform .62s cubic-bezier(.22,1,.36,1)';
+    const liked = this.state.liked, saved = this.state.saved, burst = this.state.burst;
+    const posts = POSTS.map(p => {
+      const st = u[p.id];
+      const done = !!st && st.status === 'done';
+      const paying = !!st && st.status === 'paying';
+      const clear = p.free || done;
+      const filter = clear ? 'blur(0px)' : 'blur(15px)';
+      const scale = clear ? 'scale(1)' : 'scale(1.09)';
+      const isLiked = !!liked[p.id];
+      const isSaved = !!saved[p.id];
+      const canDouble = p.free || done;
+      return Object.assign({}, p, {
+        priceLabel: '$' + p.price,
+        isFree: p.free,
+        isUnlocked: done,
+        isPaying: paying,
+        showScrim: !p.free && !done,
+        showLabel: !p.free && !st,
+        showSpinner: paying,
+        mediaStyle: 'background-image:' + p.grad + ';filter:' + filter + ';transform:' + scale + ';transition:' + trans,
+        onUnlock: () => this.unlock(p.id),
+        // like / save / comment / tip wiring
+        likeCount: fmtK(p.likes + (isLiked ? 1 : 0)),
+        likeFill: isLiked ? 'var(--primary)' : 'none',
+        likeStroke: isLiked ? 'var(--primary)' : 'currentColor',
+        likeColor: isLiked ? 'var(--primary)' : 'var(--muted)',
+        likeAnim: isLiked ? 'animation:vlikepop .42s cubic-bezier(.22,1,.36,1)' : '',
+        onLike: () => this.toggleLike(p.id),
+        onDoubleTap: canDouble ? (() => this.doubleTapLike(p.id)) : (() => {}),
+        showBurst: canDouble && !!burst[p.id],
+        saveFill: isSaved ? 'var(--primary)' : 'none',
+        saveStroke: isSaved ? 'var(--primary)' : 'currentColor',
+        saveColor: isSaved ? 'var(--primary)' : 'var(--muted)',
+        saveAnim: isSaved ? 'animation:vsavepop .42s cubic-bezier(.22,1,.36,1)' : '',
+        onSave: () => this.toggleSave(p.id),
+        commentCount: p.id === 'p1' ? '38' : p.id === 'p2' ? '127' : '24',
+        onComment: () => this.openComments(p),
+        onTip: () => this.openTip(p),
+      });
+    });
+    const notifs = [
+      { who:'Velour', what:'unveiled your reply', time:'3m ago', amt:'+$0.02', amtColor:'var(--success)', avatar:'conic-gradient(from 200deg,#5a2333,#2a1620)' },
+      { who:'Maison Rouge', what:'tipped you', time:'1h ago', amt:'+$0.50', amtColor:'var(--success)', avatar:'conic-gradient(from 160deg,#6a1d2e,#2a121a)' },
+      { who:'Noir Studio', what:'mentioned you in a post', time:'4h ago', amt:'', amtColor:'var(--faint)', avatar:'linear-gradient(135deg,#3a3640,#1c1a22)' },
+      { who:'Velour', what:'subscribed to you', time:'Yesterday', amt:'', amtColor:'var(--faint)', avatar:'conic-gradient(from 200deg,#5a2333,#2a1620)' },
+    ];
+    const threadData = [
+      { name:'Velour', preview:'New set just dropped — first one\u2019s on me 🥂', time:'2m', avatar:'conic-gradient(from 200deg,#5a2333,#2a1620)' },
+      { name:'Maison Rouge', preview:'You unlocked the whole series, legend.', time:'Jun 14', avatar:'conic-gradient(from 160deg,#6a1d2e,#2a121a)' },
+      { name:'Noir Studio', preview:'Are you coming to the rooftop shoot?', time:'Jun 10', avatar:'linear-gradient(135deg,#3a3640,#1c1a22)' },
+    ];
+    const threads = threadData.map(t => Object.assign({}, t, { onOpen: () => this.setState({ screen:'dm', dm: t, drawerOpen:false }) }));
+    const dm = this.state.dm || threadData[0];
+    const dmMsgs = [
+      { isMe:false, isText:true, isLocked:false, text:'Hey you — so glad you made it 💋' },
+      { isMe:false, isText:true, isLocked:false, text:dm.preview },
+      { isMe:true, isText:true, isLocked:false, text:'Just subscribed! Obsessed already.' },
+      { isMe:false, isText:false, isLocked:true, caption:'A little something just for you 🔥', priceLabel:'$4.99' },
+      { isMe:false, isText:true, isLocked:false, text:'Let me know what you think 😘' },
+    ].map(m => Object.assign({}, m, {
+      rowJustify: m.isMe ? 'flex-end' : 'flex-start',
+      bubbleBg: m.isMe ? 'var(--primary)' : 'var(--surface-2)',
+      bubbleColor: m.isMe ? '#fff' : 'var(--text)',
+    }));
+    const gallery = [
+      'radial-gradient(120% 120% at 30% 12%,#5a2738,#1f131a)',
+      'linear-gradient(150deg,#2c2832,#12101a)',
+      'radial-gradient(120% 120% at 72% 22%,#6a2031,#241420)',
+      'conic-gradient(from 200deg,#4a2030,#1c1117,#4a2030)',
+      'radial-gradient(120% 120% at 40% 80%,#3a2230,#140e12)',
+      'linear-gradient(135deg,#3a1622,#160d12)',
+    ];
+    // --- Notification filter chips (#2) ---
+    const notifChips = ['All','Unveils','Tips','Mentions'].map(label => {
+      const on = this.state.notifFilter === label;
+      return {
+        label,
+        onClick: () => this.setState({ notifFilter: label }),
+        chipStyle: on
+          ? 'background:var(--tint);border:1px solid rgba(194,20,59,.35);color:var(--text);font-weight:600'
+          : 'background:var(--surface-2);border:1px solid transparent;color:var(--muted);font-weight:500',
+      };
+    });
+
+    // --- Profile post grid (#4) ---
+    const tileGrads = [
+      'radial-gradient(120% 120% at 30% 12%,#5a2738,#1f131a)',
+      'linear-gradient(150deg,#2c2832,#12101a)',
+      'radial-gradient(120% 120% at 72% 22%,#6a2031,#241420)',
+      'conic-gradient(from 200deg,#4a2030,#1c1117,#4a2030)',
+      'radial-gradient(120% 120% at 40% 80%,#3a2230,#140e12)',
+      'linear-gradient(135deg,#3a1622,#160d12)',
+      'radial-gradient(120% 120% at 60% 30%,#52233a,#1a1018)',
+      'linear-gradient(160deg,#2a2230,#141019)',
+      'radial-gradient(120% 120% at 25% 70%,#5e2333,#1c1016)',
+    ];
+    const galleryTiles = tileGrads.map((g, i) => ({ grad: g, locked: [1,4,5,7].includes(i) }));
+
+    // --- Search (#3) ---
+    const searchChips = ['Velour','Noir','Rooftop sets','Maison Rouge','Free drops','Trending'];
+    const searchCreators = [
+      { name:'Velour', handle:'@velour.atelier', meta:'12.3k fans', avatar:'conic-gradient(from 200deg,#5a2333,#2a1620)' },
+      { name:'Noir Studio', handle:'@noir.studio', meta:'8.1k fans', avatar:'linear-gradient(135deg,#3a3640,#1c1a22)' },
+      { name:'Maison Rouge', handle:'@maison.rouge', meta:'21.7k fans', avatar:'conic-gradient(from 160deg,#6a1d2e,#2a121a)' },
+    ].map(c => Object.assign({}, c, { onOpen: () => this.go('profile') }));
+
+    // --- Blur review pipeline (#6) ---
+    const RST = this.state.reviewStage;
+    const isVideo = this.state.reviewType === 'video';
+    const reviewSteps = isVideo
+      ? [['detecting','Detecting sensitive regions'],['tracking','Tracking across frames'],['compositing','Applying the blur'],['ready_for_review','Preview ready']]
+      : [['detecting','Detecting sensitive regions'],['compositing','Applying the blur'],['ready_for_review','Preview ready']];
+    const ORDER = ['detecting','tracking','compositing','ready_for_review'];
+    const DONE = ['ready_for_review','publishing','published'];
+    const allDone = DONE.includes(RST);
+    const curIdx = ORDER.indexOf(RST);
+    const reviewStepVals = reviewSteps.map(([key,label],i) => {
+      const sIdx = ORDER.indexOf(key);
+      const stState = (allDone || sIdx < curIdx) ? 'done' : (sIdx === curIdx ? 'active' : 'pending');
+      return {
+        label,
+        isDone: stState==='done', isActive: stState==='active', isPending: stState==='pending',
+        notLast: i !== reviewSteps.length - 1,
+        dotBg: stState==='done' ? 'var(--primary)' : stState==='active' ? 'var(--tint)' : 'var(--surface-3)',
+        dotBorder: stState==='active' ? '1px solid var(--primary)' : '1px solid transparent',
+        labelColor: stState==='pending' ? 'var(--faint)' : stState==='active' ? 'var(--text)' : 'var(--muted)',
+        labelWeight: stState==='active' ? '600' : '400',
+        connBg: stState==='done' ? 'var(--primary)' : 'var(--hairline)',
+      };
+    });
+    const stageMeta = {
+      idle:{ label:'Idle', copy:'' },
+      detecting:{ label:'Detecting', copy:'Scanning every frame for sensitive regions…' },
+      tracking:{ label:'Tracking', copy:'Locking regions across the timeline…' },
+      compositing:{ label:'Compositing', copy:'Painting the blur mask over each region…' },
+      ready_for_review:{ label:'Ready for review', copy:'Nothing is public yet — approve to publish.' },
+      publishing:{ label:'Publishing', copy:'Pushing your blurred preview live…' },
+      published:{ label:'Published', copy:'Your blurred preview is now live in the feed.' },
+    };
+    const sm = stageMeta[RST] || stageMeta.idle;
+    const reviewProcessing = ['detecting','tracking','compositing'].includes(RST);
+    const reviewReady = RST === 'ready_for_review';
+    const reviewPublishing = RST === 'publishing';
+    const reviewPublished = RST === 'published';
+    const reviewRegions = [
+      { label:'face', conf:'97%', left:'17%', top:'8%', width:'40%', height:'26%' },
+      { label:'explicit', conf:'94%', left:'24%', top:'42%', width:'54%', height:'44%' },
+    ];
+    const pillColor = reviewPublished ? 'var(--success)' : reviewReady ? 'var(--gold)' : 'var(--primary)';
+    const pillBg = reviewPublished ? 'rgba(52,211,153,.14)' : reviewReady ? 'rgba(232,179,57,.16)' : 'var(--tint)';
+    const reviewBlur = reviewProcessing ? 'blur(26px)' : 'blur(16px)';
+
+    // --- Comments screen (Instagram-style) ---
+    const ap = this.state.activePost || POSTS[0];
+    const cLikes = this.state.commentLikes;
+    const COMMENTS = [
+      { id:'c1', who:'noir.studio', verified:true, text:'this set is unreal 🔥 the lighting', time:'2h', likes:128, avatar:'linear-gradient(135deg,#3a3640,#1c1a22)', pinned:true },
+      { id:'c2', who:'maison.rouge', verified:true, text:'okay but how do you always nail golden hour', time:'1h', likes:54, avatar:'conic-gradient(from 160deg,#6a1d2e,#2a121a)' },
+      { id:'c3', who:'lux.delacroix', verified:false, text:'unlocking immediately, no thoughts', time:'58m', likes:31, avatar:'conic-gradient(from 200deg,#4a2030,#1c1117)', reply:{ who:'velour.atelier', text:'@lux.delacroix you know it 😉', time:'47m' } },
+      { id:'c4', who:'rae_film', verified:false, text:'the velvet rope concept >>>', time:'40m', likes:12, avatar:'radial-gradient(120% 120% at 40% 80%,#3a2230,#140e12)' },
+      { id:'c5', who:'ivory.muse', verified:false, text:'saving this for inspo 🤍', time:'22m', likes:7, avatar:'linear-gradient(160deg,#2a2230,#141019)' },
+      { id:'c6', who:'dorian.k', verified:false, text:'first', time:'12m', likes:2, avatar:'radial-gradient(120% 120% at 60% 30%,#52233a,#1a1018)' },
+    ];
+    const comments = COMMENTS.map(c => {
+      const on = !!cLikes[c.id];
+      return Object.assign({}, c, {
+        likeCount: fmtK(c.likes + (on ? 1 : 0)),
+        heartFill: on ? 'var(--primary)' : 'none',
+        heartStroke: on ? 'var(--primary)' : 'var(--faint)',
+        heartAnim: on ? 'animation:vlikepop .42s cubic-bezier(.22,1,.36,1)' : '',
+        hasReply: !!c.reply,
+        replyWho: c.reply ? c.reply.who : '',
+        replyText: c.reply ? c.reply.text : '',
+        replyTime: c.reply ? c.reply.time : '',
+        onLike: () => this.toggleCommentLike(c.id),
+      });
+    });
+    const commentReacts = ['🤍','🙌','🔥','👏','😍','😮'];
+    const commentPostBg = this.state.commentText.trim() ? 'var(--primary)' : 'transparent';
+    const commentPostColor = this.state.commentText.trim() ? '#fff' : 'var(--faint)';
+
+    // --- Tip screen ---
+    const tp = this.state.tipPost || POSTS[0];
+    const TST = this.state.tipStage;
+    const tipAmt = this.state.tipAmount;
+    const tipAmounts = [1, 5, 10, 20, 50, 100].map(a => ({
+      val: a, label: '$' + a,
+      onPick: () => this.setTip(a),
+      chipStyle: a === tipAmt
+        ? 'background:var(--tint);border:1px solid rgba(194,20,59,.4);color:var(--text);font-weight:700'
+        : 'background:var(--surface-2);border:1px solid var(--hairline);color:var(--muted);font-weight:600',
+    }));
+    const tipTooLow = tipAmt > this.state.balance;
+    const tipIdle = TST === 'idle';
+    const tipSending = TST === 'sending';
+    const tipSent = TST === 'sent';
+    const tipBtnBg = tipTooLow ? 'var(--surface-3)' : 'var(--primary)';
+    const tipBtnColor = tipTooLow ? 'var(--faint)' : '#fff';
+    const tipBtnShadow = tipTooLow ? 'none' : '0 8px 28px var(--glow)';
+    const fmtMoney = (n) => '$' + n.toFixed(2);
+
+    const s = this.state.screen;
+    const canLogin = !!(this.state.email.trim() && this.state.password.trim());
+    const disp = x => (s === x ? 'flex' : 'none');
+    const active = x => (s === x ? 'var(--primary)' : 'var(--faint)');
+    return {
+      themeClass: this.state.theme === 'light' ? 'light' : '',
+      themeIsLight: this.state.theme === 'light',
+      drawerOpen: this.state.drawerOpen,
+      posts, notifs, threads, gallery,
+      themeLabel: this.state.theme === 'light' ? 'Light mode' : 'Dark mode',
+      toggleBg: this.state.theme === 'light' ? 'var(--primary)' : 'var(--surface-3)',
+      toggleX: this.state.theme === 'light' ? '20px' : '2px',
+      dOnb: disp('onboarding'), dFeed: disp('feed'), dNotif: disp('notif'),
+      dNew: disp('new'), dMsg: disp('msg'), dProf: disp('profile'), dDm: disp('dm'),
+      dSearch: disp('search'), dReview: disp('review'),
+      dComments: disp('comments'), dTip: disp('tip'),
+      dmName: dm.name, dmAvatar: dm.avatar, dmMsgs,
+      navDisp: (s === 'onboarding' || s === 'dm' || s === 'review' || s === 'comments' || s === 'tip') ? 'none' : 'flex',
+      // balance pill
+      balanceLabel: fmtMoney(this.state.balance),
+      balanceBumpKey: this.state.balanceBump,
+      balanceAnim: this.state.balanceBump > 0 ? 'animation:vbalbump .5s cubic-bezier(.22,1,.36,1)' : '',
+      // comments
+      comments, commentReacts, commentText: this.state.commentText, onCommentText: this.onCommentText,
+      commentPostBg, commentPostColor,
+      cmtPost: ap, cmtCaption: ap.caption, cmtName: ap.name, cmtHandle: ap.handle, cmtAvatar: ap.avatar, cmtTime: ap.time,
+      // tip
+      tipName: tp.name, tipHandle: tp.handle, tipAvatar: tp.avatar,
+      tipAmounts, tipAmountLabel: '' + tipAmt, tipMsg: this.state.tipMsg, onTipMsg: this.onTipMsg,
+      tipBalanceLabel: fmtMoney(this.state.balance), tipTooLow,
+      tipIdle, tipSending, tipSent,
+      tipBtnBg, tipBtnColor, tipBtnShadow, tipSendLabel: 'Send $' + tipAmt + ' tip',
+      tipSentLabel: 'Sent $' + tipAmt + ' to ' + tp.handle,
+      sendTip: this.sendTip,
+      backFromTip: () => this.go(tipSent ? 'feed' : 'feed'),
+      backFromComments: () => this.go('feed'),
+      openComments: this.openComments, openTip: this.openTip,
+      notifChips, galleryTiles, searchChips, searchCreators,
+      search: this.state.search, onSearch: this.onSearch, goSearch: () => this.go('search'),
+      openMedia: () => this._mediaInput && this._mediaInput.click(),
+      setMediaRef: (el) => { this._mediaInput = el; }, onMedia: this.onMedia,
+      autoBlur: this.state.autoBlur, toggleAutoBlur: this.toggleAutoBlur, goNext: this.goNext,
+      autoBlurBg: this.state.autoBlur ? 'var(--primary)' : 'var(--surface-3)',
+      autoBlurX: this.state.autoBlur ? '20px' : '2px',
+      reviewStepVals, reviewStageLabel: sm.label, reviewStageCopy: sm.copy,
+      reviewPillColor: pillColor, reviewPillBg: pillBg, reviewBlur, reviewIsVideo: isVideo,
+      reviewProcessing, reviewReady, reviewPublishing, reviewPublished,
+      showRegionOverlay: reviewProcessing || reviewReady, showRegionChips: reviewReady,
+      reviewRegions,
+      approveReview: this.approveReview, rerunReview: this.rerunReview,
+      backFromReview: () => this.setState({ screen:'new', reviewStage:'idle' }),
+      cFeed: active('feed'), cNotif: active('notif'), cMsg: active('msg'),
+      cProf: s === 'profile' ? 'var(--primary)' : 'transparent',
+      goFeed: () => this.go('feed'), goNotif: () => this.go('notif'), goNew: () => this.go('new'),
+      goMsg: () => this.go('msg'), goProf: () => this.go('profile'),
+      goOnb: () => this.go('onboarding'),
+      email: this.state.email, password: this.state.password,
+      showPw: this.state.showPw, hidePw: !this.state.showPw,
+      pwType: this.state.showPw ? 'text' : 'password',
+      onEmail: this.onEmail, onPassword: this.onPassword, togglePw: this.togglePw,
+      loginBg: canLogin ? 'var(--primary)' : 'var(--surface-3)',
+      loginColor: canLogin ? '#fff' : 'var(--faint)',
+      loginShadow: canLogin ? '0 8px 28px var(--glow)' : 'none',
+      loginCursor: canLogin ? 'pointer' : 'not-allowed',
+      doLogin: () => { if (canLogin) this.go('feed'); },
+      openDrawer: this.openDrawer, closeDrawer: this.closeDrawer, toggleTheme: this.toggleTheme,
+    };
+  }
+}
+</script>
+</body>
+</html>

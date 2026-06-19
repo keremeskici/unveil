@@ -236,8 +236,8 @@ export function PostCard({
 
   return (
     <article
-      className="feed-card bg-surface-2 mb-4 flex flex-col overflow-hidden rounded-md"
-      style={{ boxShadow: "0 8px 24px rgba(0,0,0,.32)" }}
+      className="feed-card bg-surface-2 border-hairline mb-4 flex flex-col overflow-hidden rounded-md border"
+      style={{ boxShadow: "var(--shadow-card)" }}
     >
       {/* Creator header */}
       <header className="flex items-center gap-3 px-4 pt-3 pb-2.5">

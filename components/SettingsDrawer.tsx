@@ -15,10 +15,12 @@ import {
   LogOut,
   ChevronDown,
   KeyRound,
+  Smartphone,
 } from "lucide-react";
 import { useTheme } from "./useTheme";
 import { useAppAuth, useAppSignOut, useAppUser } from "./useAppAuth";
 import { usePasskeyEnrollment } from "./usePasskeyEnrollment";
+import { useInstallPrompt } from "./useInstallPrompt";
 
 export function SettingsDrawer({
   open,
@@ -31,6 +33,7 @@ export function SettingsDrawer({
   const { isSignedIn } = useAppAuth();
   const signOut = useAppSignOut();
   const { user } = useAppUser();
+  const { canInstall, promptInstall } = useInstallPrompt();
 
   useEffect(() => {
     if (!open) return;
@@ -153,6 +156,19 @@ export function SettingsDrawer({
             <span className="flex-1 text-[15px] font-medium">English</span>
             <ChevronDown size={18} className="text-faint" />
           </button>
+
+          {/* PWA install — only shown when the browser offers it (Add to Home
+              Screen used to be a floating banner; it now lives here). */}
+          {canInstall && (
+            <button
+              type="button"
+              onClick={promptInstall}
+              className="flex w-full items-center gap-3.5 px-[22px] py-3.5 text-left"
+            >
+              <Smartphone size={21} strokeWidth={1.8} className="text-muted" />
+              <span className="text-[15px] font-medium">Add to Home Screen</span>
+            </button>
+          )}
           <Divider />
           <button
             type="button"

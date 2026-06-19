@@ -11,6 +11,9 @@
   /* Canvas & surfaces */
   --bg: #121012;
   --header-bg: #010101;
+  --header-fg: #f5f2f3;
+  --header-fg-muted: #a8a0a4;
+  --header-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
   --surface: #1a171a;
   --surface-2: #211d21;
   --surface-3: #2a252a;
@@ -51,7 +54,8 @@
   --radius-pill: 9999px;
 
   /* Elevation — tint + soft shadow, no harsh lines */
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 6px 20px rgba(0, 0, 0, 0.30);
+  --shadow-nav: 0 -1px 0 rgba(255, 255, 255, 0.05), 0 -6px 18px rgba(0, 0, 0, 0.18);
   --shadow-cta: 0 8px 28px var(--primary-glow);
 
   /* Motion */
@@ -64,13 +68,17 @@
 .light {
   color-scheme: light;
 
-  --bg: #ffffff;
-  --header-bg: #010101;
+  /* Soft warm-gray canvas so the white islands read as distinct surfaces. */
+  --bg: #f1efec;
+  --header-bg: #ffffff;
+  --header-fg: #1a1718;
+  --header-fg-muted: #5c5559;
+  --header-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.05);
   --surface: #ffffff;
-  --surface-2: #fafaf9;
-  --surface-3: #f2f0f1;
-  --hairline: rgba(0, 0, 0, 0.08);
-  --hairline-strong: rgba(0, 0, 0, 0.14);
+  --surface-2: #ffffff;
+  --surface-3: #f0eeeb;
+  --hairline: rgba(0, 0, 0, 0.07);
+  --hairline-strong: rgba(0, 0, 0, 0.12);
 
   --primary: #b01237;
   --primary-hover: #c2143b;
@@ -88,7 +96,8 @@
   --gold: #b8860b;
   --danger: #d23150;
 
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.05);
+  --shadow-nav: 0 -1px 0 rgba(0, 0, 0, 0.05), 0 -6px 16px rgba(0, 0, 0, 0.03);
 }
 
 /* Map semantic vars → Tailwind utilities. `inline` keeps the var
@@ -226,6 +235,27 @@
     opacity: 1;
   }
 }
+@keyframes vtyping-bubble {
+  0%,
+  100% {
+    transform: translateY(0) scaleX(1);
+  }
+  45% {
+    transform: translateY(-1px) scaleX(1.04);
+  }
+}
+@keyframes vtyping-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.34;
+    transform: translateY(0) scale(0.82);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+  }
+}
 @keyframes vdrawer {
   from {
     transform: translateX(100%);
@@ -318,6 +348,14 @@
   }
   to {
     transform: translateY(0);
+  }
+}
+@keyframes scanBlob {
+  from {
+    transform: translateX(-48%) scale(0.9);
+  }
+  to {
+    transform: translateX(310%) scale(1.08);
   }
 }
 @keyframes vsheetout {
@@ -437,17 +475,16 @@ body {
   overscroll-behavior-y: contain;
 }
 
-.feed-card {
-  min-height: calc(100dvh - 170px - env(safe-area-inset-bottom, 0px));
-  max-height: calc(100dvh - 170px - env(safe-area-inset-bottom, 0px));
-}
-
+/* The card sizes to its content (header + caption + media + actions) instead of
+   being pinned to a full-screen height — no dead space below short posts. The
+   `mb-4` between cards provides the bit of breathing room between posts. */
 .feed-card > .relative {
   min-height: 0;
 }
 
+/* Keep tall media from exceeding the viewport; object-cover handles the crop. */
 .feed-media {
-  max-height: calc(100dvh - 315px - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 260px - env(safe-area-inset-bottom, 0px));
 }
 
 .feed-card :where(img, video) {
@@ -456,6 +493,35 @@ body {
 
 .tab-panel {
   animation: vtabin 220ms var(--ease-out) both;
+}
+
+.typing-bubble {
+  display: flex;
+  height: 38px;
+  min-width: 68px;
+  align-items: center;
+  gap: 5px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  padding: 0 15px;
+  animation: vtyping-bubble 1.35s var(--ease-veil) infinite;
+}
+
+.typing-bubble span {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--muted);
+  animation: vtyping-dot 1.1s ease-in-out infinite;
+}
+
+.typing-bubble span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.typing-bubble span:nth-child(3) {
+  animation-delay: 0.32s;
 }
 
 .animate-accordion-down {
@@ -501,6 +567,24 @@ button:disabled {
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Typable fields signal focus through their own border/ring treatment, so the
+   global outline above would just box them in an off-shape crimson rectangle
+   while you type. Drop it for text fields; buttons, links, and other controls
+   keep their keyboard focus ring. (This rule is unlayered + higher specificity,
+   so it reliably overrides the Tailwind `outline-none` utility too.) */
+input[type="text"]:focus-visible,
+input[type="search"]:focus-visible,
+input[type="email"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="tel"]:focus-visible,
+input[type="url"]:focus-visible,
+input:not([type]):focus-visible,
+textarea:focus-visible,
+[contenteditable]:focus-visible {
+  outline: none;
 }
 
 /* iOS safe-area helpers for fixed top/bottom chrome */

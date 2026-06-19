@@ -4,8 +4,15 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Home, Bell, Plus, MessageCircle } from "lucide-react";
 import { useAppAuth } from "./useAppAuth";
+import { feedQueryKey, fetchFeed } from "@/lib/feed-client";
+import { fetchMessages, messagesQueryKey } from "@/lib/messages-client";
+import {
+  fetchNotifications,
+  notificationsQueryKey,
+} from "@/lib/notifications-client";
 
 // The settings drawer (with its passkey/theme logic) only matters once the fan
 // taps Profile — defer its chunk until then instead of shipping it with the nav.
@@ -15,35 +22,67 @@ const SettingsDrawer = dynamic(() =>
 
 export function BottomNav() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const { isSignedIn } = useAppAuth();
   const [unread, setUnread] = useState(0);
   const [drawer, setDrawer] = useState(false);
   // Stays true after the first open so the close animation still runs.
   const [drawerMounted, setDrawerMounted] = useState(false);
 
-  // Real unread-message badge. Refetched on navigation (cheap) so opening a
-  // thread — which marks it read — clears the badge when you come back.
+  // Real unread-message badge. It reads through the shared inbox cache, so the
+  // badge, Messages screen, and tab prefetch all dedupe the same request.
   useEffect(() => {
     if (!isSignedIn) {
       setUnread(0);
       return;
     }
-    let live = true;
-    fetch("/api/messages")
-      .then((r) => r.json())
+    void queryClient
+      .fetchQuery({
+        queryKey: messagesQueryKey,
+        queryFn: fetchMessages,
+        staleTime: 30_000,
+      })
       .then((d) => {
-        if (!live) return;
-        const total = (d.threads ?? []).reduce(
-          (n: number, t: { unread: number }) => n + (t.unread ?? 0),
-          0,
-        );
+        const total = d.threads.reduce((n, t) => n + (t.unread ?? 0), 0);
         setUnread(total);
       })
       .catch(() => {});
-    return () => {
-      live = false;
+  }, [isSignedIn, pathname, queryClient]);
+
+  // Keep the other main tabs warm while the user is elsewhere. Then taps can
+  // reuse cached rows instead of showing a fresh loading pass.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const prefetch = () => {
+      if (pathname !== "/") {
+        void queryClient.prefetchQuery({
+          queryKey: feedQueryKey,
+          queryFn: fetchFeed,
+          staleTime: 60_000,
+        });
+      }
+      if (!pathname.startsWith("/messages")) {
+        void queryClient.prefetchQuery({
+          queryKey: messagesQueryKey,
+          queryFn: fetchMessages,
+          staleTime: 30_000,
+        });
+      }
+      if (!pathname.startsWith("/notifications")) {
+        void queryClient.prefetchQuery({
+          queryKey: notificationsQueryKey,
+          queryFn: fetchNotifications,
+          staleTime: 30_000,
+        });
+      }
     };
-  }, [isSignedIn, pathname]);
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(prefetch, { timeout: 1500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = globalThis.setTimeout(prefetch, 300);
+    return () => globalThis.clearTimeout(id);
+  }, [isSignedIn, pathname, queryClient]);
 
   const TABS = [
     { href: "/", label: "Feed", icon: Home },
@@ -74,7 +113,7 @@ export function BottomNav() {
         className="bg-surface border-hairline-strong fixed inset-x-0 bottom-0 z-30 border-t backdrop-blur-xl"
         style={{
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
-          boxShadow: "0 -12px 32px rgba(0,0,0,.34)",
+          boxShadow: "var(--shadow-nav)",
         }}
       >
         <div className="mx-auto flex w-full max-w-md items-center justify-around px-4 pt-2">

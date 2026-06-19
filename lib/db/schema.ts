@@ -154,6 +154,10 @@ export const unlocks = pgTable(
 // fully-blurred clip plays free; each region overlays a clean crop once unlocked.
 // Price is NOT stored here — every region costs `posts.unlockPrice`.
 export type RegionRect = { x: number; y: number; w: number; h: number }; // normalized 0..1
+// One sample of a region's position over time: `t` seconds into the clip, `rect`
+// normalized 0..1 of the source frame. A region's `track` is these sampled from
+// the SAM2 mask so the player can make the tap-button follow the moving area.
+export type RegionTrackPoint = { t: number; rect: RegionRect };
 
 export const postRegions = pgTable(
   "post_regions",
@@ -165,6 +169,9 @@ export const postRegions = pgTable(
     label: varchar("label", { length: 64 }).notNull(), // server-side only; never shown raw
     // Union bbox across all frames, normalized 0..1 so it scales to any size.
     rect: jsonb("rect").$type<RegionRect>().notNull(),
+    // Per-frame position track (from the SAM2 mask) so the player's tap-button
+    // can follow the moving blurred area. Null on legacy/static regions.
+    track: jsonb("track").$type<RegionTrackPoint[]>(),
     // Private clean crop of just this region. Presigned on unlock.
     patchMediaKey: text("patch_media_key").notNull(),
     position: integer("position").notNull().default(0), // stacking / button order
@@ -306,6 +313,7 @@ export type RegionPatch = {
   label: string;
   rect: RegionRect;
   patchKey: string; // private pathname of the cropped clean clip
+  track?: RegionTrackPoint[]; // per-frame box track for the moving tap-button
 };
 
 export const blurJobs = pgTable(

@@ -6,9 +6,11 @@ import { ArrowLeft, Check, CreditCard, Send } from "lucide-react";
 import { Avatar } from "./ui/Avatar";
 import { useAppAuth } from "./useAppAuth";
 
-const PRESETS = [1, 5, 10, 20, 50, 100];
+const PRESETS = [1, 10, 20, 50, 100];
+const DEFAULT_CUSTOM_AMOUNT = "5";
 
 type TipStage = "idle" | "sending" | "sent" | "error";
+type AmountMode = "custom" | "preset";
 
 function haptic(pattern: number | number[]) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -22,6 +24,33 @@ function haptic(pattern: number | number[]) {
 
 function money(n: number) {
   return `$${n.toFixed(2)}`;
+}
+
+function parseTipAmount(input: string) {
+  const raw = input.trim();
+  if (!/^\d{0,6}(\.\d{1,2})?$/.test(raw)) return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value;
+}
+
+function sanitizeTipAmountInput(input: string) {
+  const cleaned = input.replace(/[^\d.]/g, "");
+  const dot = cleaned.indexOf(".");
+  if (dot === -1) return cleaned.slice(0, 6);
+
+  const whole = cleaned.slice(0, dot).slice(0, 6);
+  const decimal = cleaned
+    .slice(dot + 1)
+    .replace(/\./g, "")
+    .slice(0, 2);
+  return `${whole}.${decimal}`;
+}
+
+function formatTipAmount(value: number) {
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(2).replace(/0$/, "");
 }
 
 /**
@@ -45,11 +74,18 @@ export function TipSheet({
 }) {
   const router = useRouter();
   const { isSignedIn } = useAppAuth();
-  const [amount, setAmount] = useState(5);
+  const [amountMode, setAmountMode] = useState<AmountMode>("custom");
+  const [presetAmount, setPresetAmount] = useState(10);
+  const [customAmount, setCustomAmount] = useState(DEFAULT_CUSTOM_AMOUNT);
   const [message, setMessage] = useState("");
   const [stage, setStage] = useState<TipStage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+
+  const customTipAmount = parseTipAmount(customAmount);
+  const amount = amountMode === "custom" ? customTipAmount : presetAmount;
+  const amountLabel = amount == null ? "0" : formatTipAmount(amount);
+  const invalidAmount = amount == null;
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -73,7 +109,7 @@ export function TipSheet({
     };
   }, []);
 
-  const tooLow = balance != null && amount > balance;
+  const tooLow = amount != null && balance != null && amount > balance;
 
   const send = useCallback(async () => {
     if (stage !== "idle") return;
@@ -81,6 +117,7 @@ export function TipSheet({
       router.push("/sign-in");
       return;
     }
+    if (amount == null) return;
     if (tooLow) return;
     setStage("sending");
     setError(null);
@@ -170,21 +207,70 @@ export function TipSheet({
               className="tabular text-[72px] leading-none font-bold tracking-tight"
               style={{ fontFamily: "var(--font-mono, 'Geist Mono'), monospace" }}
             >
-              {amount}
+              {amountLabel}
             </span>
           </div>
 
           {/* Preset chips */}
           <div className="grid w-full max-w-[320px] grid-cols-3 gap-2.5">
+            <label
+              className="tabular flex h-[50px] items-center justify-center gap-1 rounded-[14px] px-3 text-[17px] transition-colors"
+              style={
+                amountMode === "custom"
+                  ? {
+                      background: "var(--tint)",
+                      border: "1px solid rgba(194,20,59,.4)",
+                      color: "var(--text)",
+                      fontWeight: 700,
+                      fontFamily: "var(--font-mono, 'Geist Mono'), monospace",
+                    }
+                  : {
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--hairline)",
+                      color: "var(--muted)",
+                      fontWeight: 600,
+                      fontFamily: "var(--font-mono, 'Geist Mono'), monospace",
+                    }
+              }
+            >
+              <span className="text-primary">$</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.]?[0-9]*"
+                aria-label="Custom tip amount"
+                value={customAmount}
+                onFocus={() => {
+                  if (stage !== "idle") return;
+                  setAmountMode("custom");
+                }}
+                onChange={(e) => {
+                  if (stage !== "idle") return;
+                  setAmountMode("custom");
+                  setCustomAmount(sanitizeTipAmountInput(e.target.value));
+                  setError(null);
+                }}
+                onBlur={() => {
+                  if (customTipAmount != null) {
+                    setCustomAmount(formatTipAmount(customTipAmount));
+                  }
+                }}
+                disabled={stage !== "idle"}
+                placeholder="Custom"
+                className="min-w-0 flex-1 bg-transparent text-center text-[17px] font-inherit text-inherit outline-none placeholder:text-[color:var(--faint)] disabled:opacity-70"
+              />
+            </label>
             {PRESETS.map((a) => {
-              const on = a === amount;
+              const on = amountMode === "preset" && a === amount;
               return (
                 <button
                   key={a}
                   type="button"
                   onClick={() => {
                     if (stage !== "idle") return;
-                    setAmount(a);
+                    setPresetAmount(a);
+                    setAmountMode("preset");
+                    setError(null);
                     haptic(4);
                   }}
                   className="tabular h-[50px] rounded-[14px] text-[17px] transition-transform active:scale-95"
@@ -220,7 +306,7 @@ export function TipSheet({
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Add a message (optional)"
             maxLength={140}
-            className="bg-surface-2 border-hairline text-text mt-[18px] w-full max-w-[320px] rounded-[14px] border px-4 py-3.5 text-sm outline-none"
+            className="bg-surface-2 border-hairline text-text mt-[18px] w-full max-w-[320px] rounded-[14px] border px-4 py-3.5 text-sm outline-none focus:border-[color:var(--primary)]"
           />
 
           {/* Balance */}
@@ -236,6 +322,11 @@ export function TipSheet({
           {tooLow && (
             <div className="text-primary mt-2 text-[12.5px] font-semibold">
               Not enough balance for this tip
+            </div>
+          )}
+          {invalidAmount && amountMode === "custom" && (
+            <div className="text-primary mt-2 text-[12.5px] font-semibold">
+              Enter a custom tip amount
             </div>
           )}
           {error && (
@@ -255,12 +346,14 @@ export function TipSheet({
           <button
             type="button"
             onClick={send}
-            disabled={stage !== "idle" || tooLow}
+            disabled={stage !== "idle" || tooLow || invalidAmount}
             className="flex h-[54px] w-full items-center justify-center gap-2.5 rounded-2xl text-base font-bold transition-transform active:scale-[0.985] disabled:cursor-not-allowed"
             style={{
-              background: tooLow ? "var(--surface-3)" : "var(--primary)",
-              color: tooLow ? "var(--faint)" : "#fff",
-              boxShadow: tooLow ? "none" : "var(--shadow-cta)",
+              background:
+                tooLow || invalidAmount ? "var(--surface-3)" : "var(--primary)",
+              color: tooLow || invalidAmount ? "var(--faint)" : "#fff",
+              boxShadow:
+                tooLow || invalidAmount ? "none" : "var(--shadow-cta)",
             }}
           >
             {stage === "sending" ? (
@@ -274,12 +367,12 @@ export function TipSheet({
             ) : stage === "sent" ? (
               <>
                 <Check size={20} strokeWidth={2.4} />
-                <span>Sent ${amount} to {creatorHandle}</span>
+                <span>Sent ${amountLabel} to {creatorHandle}</span>
               </>
             ) : (
               <>
                 <Send size={19} strokeWidth={2.2} />
-                <span>Send ${amount} tip</span>
+                <span>{invalidAmount ? "Send tip" : `Send $${amountLabel} tip`}</span>
               </>
             )}
           </button>

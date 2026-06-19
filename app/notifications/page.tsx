@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Bell, Bookmark, KeyRound } from "lucide-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, KeyRound } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomNav } from "@/components/BottomNav";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -9,41 +10,41 @@ import { EmptyState } from "@/components/EmptyState";
 import { timeAgo } from "@/lib/time";
 import { useAppAuth } from "@/components/useAppAuth";
 import { usePasskeyEnrollment } from "@/components/usePasskeyEnrollment";
+import {
+  fetchNotifications,
+  notificationsQueryKey,
+  type NotifType,
+} from "@/lib/notifications-client";
 
-type NotifType = "unlock" | "tip" | "comment" | "follow" | "post";
-type FilterLabel = "Unveils" | "New" | "Bookmarks";
-
-type Notif = {
-  id: string;
-  type: NotifType;
-  actor: string;
-  avatar: string | null;
-  action: string;
-  postTitle: string;
-  amount: string;
-  at: string;
-};
-
-type BookmarkItem = {
-  id: string;
-  postId: string;
-  title: string;
-  creator: string;
-  avatar: string | null;
-  at: string;
-};
+type FilterLabel = "Unveiled" | "Following" | "Tips";
 
 const FILTERS: { label: FilterLabel; match: (t: NotifType) => boolean }[] = [
-  { label: "Unveils", match: (t) => t === "unlock" },
-  { label: "New", match: (t) => t === "post" },
-  { label: "Bookmarks", match: () => false },
+  { label: "Unveiled", match: (t) => t === "unlock" },
+  { label: "Following", match: (t) => t === "post" },
+  { label: "Tips", match: (t) => t === "tip" },
 ];
 
 const EMPTY_BODY: Record<FilterLabel, string> = {
-  Unveils: "When someone unveils one of your posts, you'll see it here.",
-  New: "New posts from creators you follow will show up here.",
-  Bookmarks: "Posts you bookmark will show up here.",
+  Unveiled: "When someone unveils one of your posts, you'll see it here.",
+  Following: "New posts from creators you follow will show up here.",
+  Tips: "Tips you receive will show up here.",
 };
+
+function NotificationsSkeleton() {
+  return (
+    <ul className="px-[18px]">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <li key={i} className="border-hairline flex items-center gap-3.5 border-b py-3.5">
+          <span className="bg-surface-3 size-11 rounded-full" />
+          <span className="min-w-0 flex-1 space-y-2">
+            <span className="bg-surface-3 block h-4 w-56 max-w-full rounded-full" />
+            <span className="bg-surface-3 block h-3 w-20 rounded-full" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function NotificationsPage() {
   const { isSignedIn } = useAppAuth();
@@ -51,37 +52,23 @@ export default function NotificationsPage() {
   const passkey = usePasskeyEnrollment();
   // Local-only synthetic notification — never returned by /api/notifications.
   const showPasskeyNotif = passkey.canEnroll && !passkey.isDismissed;
-  const [items, setItems] = useState<Notif[] | null>(null);
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[] | null>(null);
-  const [filter, setFilter] = useState<FilterLabel>("Unveils");
-
-  useEffect(() => {
-    if (!connected) return;
-    let live = true;
-    setItems(null);
-    setBookmarks(null);
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((d) => live && setItems(d.items ?? []))
-      .catch(() => live && setItems([]));
-    fetch("/api/bookmarks")
-      .then((r) => r.json())
-      .then((d) => live && setBookmarks(d.items ?? []))
-      .catch(() => live && setBookmarks([]));
-    return () => {
-      live = false;
-    };
-  }, [connected]);
+  const [filter, setFilter] = useState<FilterLabel>("Unveiled");
+  const notifications = useQuery({
+    queryKey: notificationsQueryKey,
+    queryFn: fetchNotifications,
+    enabled: connected,
+    staleTime: 30_000,
+  });
 
   const active = FILTERS.find((f) => f.label === filter) ?? FILTERS[0];
-  const visible = items ? items.filter((n) => active.match(n.type)) : null;
-  const showingBookmarks = filter === "Bookmarks";
+  const items = notifications.data?.items ?? [];
+  const visible = items.filter((n) => active.match(n.type));
 
   return (
     <main className="flex min-h-dvh flex-1 flex-col">
       <header className="bg-surface/80 border-hairline pt-safe sticky top-0 z-40 border-b backdrop-blur-xl">
         <div className="mx-auto w-full max-w-md px-[18px] py-3.5">
-          <span className="text-xl font-bold">Notifications</span>
+          <h1 className="text-xl font-bold">Notifications</h1>
         </div>
       </header>
 
@@ -108,6 +95,7 @@ export default function NotificationsPage() {
                     key={f.label}
                     type="button"
                     onClick={() => setFilter(f.label)}
+                    aria-pressed={on}
                     className="shrink-0 rounded-pill px-4 py-2 text-[13.5px] transition-transform active:scale-95"
                     style={
                       on
@@ -131,7 +119,7 @@ export default function NotificationsPage() {
             </div>
 
             <div key={filter} className="tab-panel">
-              {showPasskeyNotif && filter === "Unveils" && (
+              {showPasskeyNotif && filter === "Unveiled" && (
                 <ul className="px-[18px]">
                   <PasskeyNotifRow
                     isPending={passkey.isPending}
@@ -141,47 +129,18 @@ export default function NotificationsPage() {
                   />
                 </ul>
               )}
-              {showingBookmarks ? (
-                bookmarks === null ? (
-                  <p className="text-faint mt-16 text-center text-sm">Loading…</p>
-                ) : bookmarks.length === 0 ? (
-                  <div className="mt-10">
-                    <EmptyState
-                      icon={Bookmark}
-                      title="No bookmarks yet"
-                      body={EMPTY_BODY.Bookmarks}
-                    />
-                  </div>
-                ) : (
-                  <ul className="px-[18px]">
-                    {bookmarks.map((item) => (
-                      <li
-                        key={item.id}
-                        className="border-hairline flex items-center gap-3.5 border-b py-3.5"
-                      >
-                        <Avatar name={item.creator} src={item.avatar} size="lg" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[14.5px] leading-snug">
-                            <span className="font-semibold">Bookmarked</span>
-                            <span className="text-text"> “{item.title}”</span>
-                          </p>
-                          <p className="text-faint mt-0.5 text-[12px]">
-                            {item.creator} · {timeAgo(item.at)}
-                          </p>
-                        </div>
-                        <Bookmark
-                          size={18}
-                          aria-hidden
-                          style={{ color: "var(--primary)", fill: "var(--primary)" }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )
-              ) : visible === null ? (
-                <p className="text-faint mt-16 text-center text-sm">Loading…</p>
+              {notifications.isLoading ? (
+                <NotificationsSkeleton />
+              ) : notifications.isError ? (
+                <div className="mt-10">
+                  <EmptyState
+                    icon={Bell}
+                    title="Could not load notifications"
+                    body="Check your connection and try again."
+                  />
+                </div>
               ) : visible.length === 0 ? (
-                showPasskeyNotif && filter === "Unveils" ? null : (
+                showPasskeyNotif && filter === "Unveiled" ? null : (
                   <div className="mt-10">
                     <EmptyState
                       icon={Bell}

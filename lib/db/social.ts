@@ -364,6 +364,130 @@ export async function getFollowingCount(userId: string): Promise<number> {
   return Number(r?.n ?? 0);
 }
 
+export type CreatorStats = {
+  posts: number;
+  locked: number;
+  likes: number;
+  /** Users who follow this profile. */
+  fans: number;
+  /** Profiles this user follows. */
+  following: number;
+};
+
+/**
+ * Headline counts for a creator's own profile: published posts (and how many are
+ * paid/locked), follower ("fans") and following counts, and total likes received
+ * across their posts.
+ */
+export async function getCreatorStats(userId: string): Promise<CreatorStats> {
+  const db = getDb();
+  const [postAgg, likeAgg, fans, following] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`COUNT(*)`,
+        locked: sql<number>`COUNT(*) FILTER (WHERE ${posts.unlockPrice} > 0)`,
+      })
+      .from(posts)
+      .where(and(eq(posts.creatorId, userId), eq(posts.isPublished, true))),
+    db
+      .select({ n: sql<number>`COUNT(*)` })
+      .from(postLikes)
+      .innerJoin(posts, eq(postLikes.postId, posts.id))
+      .where(eq(posts.creatorId, userId)),
+    getFollowerCount(userId),
+    getFollowingCount(userId),
+  ]);
+  return {
+    posts: Number(postAgg[0]?.total ?? 0),
+    locked: Number(postAgg[0]?.locked ?? 0),
+    likes: Number(likeAgg[0]?.n ?? 0),
+    fans,
+    following,
+  };
+}
+
+// ── Follower / following lists ──────────────────────────────────────────────
+
+export type ConnectionUser = {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatar: string | null;
+  walletAddress: string;
+  /** Whether the viewer currently follows this user. */
+  following: boolean;
+  /** Whether this row is the viewer themselves. */
+  isSelf: boolean;
+};
+
+type ConnectionRow = {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatar: string | null;
+  walletAddress: string;
+};
+
+function shapeConnections(
+  rows: ConnectionRow[],
+  followed: Set<string>,
+  viewerId?: string,
+): ConnectionUser[] {
+  return rows.map((r) => ({
+    id: r.id,
+    username: r.username,
+    displayName: r.displayName,
+    avatar: r.avatar,
+    walletAddress: r.walletAddress,
+    following: followed.has(r.id),
+    isSelf: r.id === viewerId,
+  }));
+}
+
+const CONNECTION_COLUMNS = {
+  id: users.id,
+  username: users.username,
+  displayName: users.displayName,
+  avatar: users.avatar,
+  walletAddress: users.walletAddress,
+} as const;
+
+/** Users who follow `userId`, newest first. `following` reflects `viewerId`. */
+export async function listFollowers(
+  userId: string,
+  viewerId?: string,
+  limit = 200,
+): Promise<ConnectionUser[]> {
+  const rows = await getDb()
+    .select(CONNECTION_COLUMNS)
+    .from(follows)
+    .innerJoin(users, eq(follows.followerId, users.id))
+    .where(eq(follows.followingId, userId))
+    .orderBy(desc(follows.createdAt))
+    .limit(limit);
+
+  const followed = await followedSet(viewerId, rows.map((r) => r.id));
+  return shapeConnections(rows, followed, viewerId);
+}
+
+/** Users `userId` follows, newest first. `following` reflects `viewerId`. */
+export async function listFollowing(
+  userId: string,
+  viewerId?: string,
+  limit = 200,
+): Promise<ConnectionUser[]> {
+  const rows = await getDb()
+    .select(CONNECTION_COLUMNS)
+    .from(follows)
+    .innerJoin(users, eq(follows.followingId, users.id))
+    .where(eq(follows.followerId, userId))
+    .orderBy(desc(follows.createdAt))
+    .limit(limit);
+
+  const followed = await followedSet(viewerId, rows.map((r) => r.id));
+  return shapeConnections(rows, followed, viewerId);
+}
+
 /** Toggle follow(follower → following). Returns new state + follower count. */
 export async function toggleFollow(followerId: string, followingId: string) {
   if (followerId === followingId) {

@@ -13,6 +13,8 @@
     "key:init": "dotenv -e .env.local -- tsx scripts/init-platform-key.ts",
     "key:rotate": "dotenv -e .env.local -- tsx scripts/init-platform-key.ts --rotate",
     "seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
+    "reseed": "dotenv -e .env.local -- tsx scripts/reseed-posts.ts",
+    "new-post": "dotenv -e .env.local -- tsx scripts/add-ppv-post.ts",
     "token:create": "dotenv -e .env.local -- tsx scripts/create-token.ts"
   },
   "dependencies": {

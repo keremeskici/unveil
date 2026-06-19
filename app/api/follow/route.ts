@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
       : null;
 
   if (!target) return Response.json({ error: "User not found" }, { status: 404 });
+  if (target.id === user.id) {
+    return Response.json({ error: "You can't follow yourself" }, { status: 400 });
+  }
 
   const result = await toggleFollow(user.id, target.id);
   return setAccountCookie(NextResponse.json(result), user.id);

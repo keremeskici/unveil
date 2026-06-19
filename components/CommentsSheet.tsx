@@ -17,7 +17,7 @@ import { useAppAuth } from "./useAppAuth";
 import { timeAgo } from "@/lib/time";
 import type { CommentNode } from "@/lib/db/social";
 
-const REACTS = ["🤍", "🙌", "🔥", "👏", "😍", "😮"];
+const REACTS = ["🤍", "🔥", "😍", "🥵", "💦", "🍑", "😈", "🤤", "👏", "🙌", "😮", "💯"];
 
 function haptic(pattern: number | number[]) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -213,7 +213,7 @@ export function CommentsSheet({
                 <DiscussionItem
                   key={c.id}
                   value={c.id}
-                  className="border-hairline bg-surface rounded-md border px-3 py-3 pl-3 before:left-3 before:top-3 before:bottom-3"
+                  className="border-hairline bg-surface rounded-md border px-3.5 py-3 before:hidden"
                 >
                   <DiscussionContent className="gap-2.5">
                     <Avatar name={c.who} src={c.avatar} size="sm" />
@@ -285,62 +285,69 @@ export function CommentsSheet({
           <div className="h-2" />
         </div>
 
-        {/* Emoji quick reacts */}
-        <div className="border-hairline flex items-center justify-between border-t px-[18px] pt-2.5 pb-[7px]">
-          {REACTS.map((e) => (
-            <button
-              key={e}
-              type="button"
-              onClick={() => setText((t) => t + e)}
-              className="text-[23px] leading-none"
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-
-        {/* Composer */}
+        {/* Footer — emoji bar + composer move together when the input is focused */}
         <div
-          className="border-hairline bg-surface border-t px-3.5 pt-2 transition-transform duration-[220ms] ease-veil focus-within:-translate-y-5 motion-reduce:transform-none motion-reduce:transition-none"
+          className="bg-surface transition-transform duration-[220ms] ease-veil focus-within:-translate-y-5 motion-reduce:transform-none motion-reduce:transition-none"
           style={{
             paddingBottom: "max(20px, env(safe-area-inset-bottom, 0px))",
           }}
         >
-          {replyTo && (
-            <div className="text-faint mb-1.5 flex items-center justify-between px-1 text-xs">
-              <span>Replying to {replyTo.who}</span>
+          {/* Emoji quick reacts */}
+          <div className="border-hairline flex items-center gap-2.5 overflow-x-auto border-t px-3.5 py-2.5">
+            {REACTS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                aria-label={`React with ${e}`}
+                onClick={() => {
+                  haptic(4);
+                  setText((t) => t + e);
+                }}
+                className="bg-surface-2 hover:bg-surface-3 flex size-[42px] shrink-0 items-center justify-center rounded-full text-[23px] leading-none transition-transform active:scale-90"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+
+          {/* Composer */}
+          <div className="border-hairline border-t px-3.5 pt-2.5">
+            {replyTo && (
+              <div className="text-faint mb-1.5 flex items-center justify-between px-1 text-xs">
+                <span>Replying to {replyTo.who}</span>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  className="hover:text-text font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            <div className="bg-surface-2 border-hairline flex items-center gap-2 rounded-pill border py-[7px] pr-[7px] pl-4 focus-within:border-[color:var(--primary)]">
+              <input
+                ref={inputRef}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+                placeholder={replyTo ? `Reply to ${replyTo.who}…` : "Add a comment…"}
+                className="text-text min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
               <button
                 type="button"
-                onClick={() => setReplyTo(null)}
-                className="hover:text-text font-semibold"
+                onClick={submit}
+                disabled={!text.trim() || posting}
+                className="h-[30px] rounded-pill px-3.5 text-[13.5px] font-bold transition-colors"
+                style={{
+                  background: text.trim() ? "var(--primary)" : "transparent",
+                  color: text.trim() ? "#fff" : "var(--faint)",
+                }}
               >
-                Cancel
+                Post
               </button>
             </div>
-          )}
-          <div className="bg-surface-2 border-hairline flex items-center gap-2 rounded-pill border py-[7px] pr-[7px] pl-4">
-            <input
-              ref={inputRef}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submit();
-              }}
-              placeholder={replyTo ? `Reply to ${replyTo.who}…` : "Add a comment…"}
-              className="text-text min-w-0 flex-1 bg-transparent text-sm outline-none"
-            />
-            <button
-              type="button"
-              onClick={submit}
-              disabled={!text.trim() || posting}
-              className="h-[30px] rounded-pill px-3.5 text-[13.5px] font-bold transition-colors"
-              style={{
-                background: text.trim() ? "var(--primary)" : "transparent",
-                color: text.trim() ? "#fff" : "var(--faint)",
-              }}
-            >
-              Post
-            </button>
           </div>
         </div>
       </div>

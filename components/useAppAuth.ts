@@ -32,7 +32,9 @@ function hasDevAuthCookie() {
 }
 
 function useDevAuthCookie() {
-  const [isDevSignedIn, setIsDevSignedIn] = useState(false);
+  const [isDevSignedIn, setIsDevSignedIn] = useState<boolean | null>(
+    isDevAuthEnabled() ? null : false,
+  );
 
   useEffect(() => {
     const sync = () => setIsDevSignedIn(hasDevAuthCookie());
@@ -56,13 +58,24 @@ export function useAppAuth() {
   const auth = useAuth();
   const isDevSignedIn = useDevAuthCookie();
 
-  if (!isDevSignedIn) return { ...auth, isDevSignedIn };
+  if (isDevSignedIn === true) {
+    return {
+      ...auth,
+      isLoaded: true,
+      isSignedIn: true,
+      isDevSignedIn: true,
+    };
+  }
 
   return {
     ...auth,
-    isLoaded: true,
-    isSignedIn: true,
-    isDevSignedIn,
+    isLoaded:
+      isDevSignedIn === null && auth.isSignedIn !== true ? false : auth.isLoaded,
+    isSignedIn:
+      isDevSignedIn === null && auth.isSignedIn !== true
+        ? undefined
+        : auth.isSignedIn,
+    isDevSignedIn: false,
   };
 }
 
@@ -70,20 +83,33 @@ export function useAppUser() {
   const clerkUser = useUser();
   const isDevSignedIn = useDevAuthCookie();
 
-  if (!isDevSignedIn) return { ...clerkUser, isDevSignedIn };
+  if (isDevSignedIn === true) {
+    return {
+      ...clerkUser,
+      isLoaded: true,
+      isSignedIn: true,
+      user: DEV_CLIENT_USER,
+      isDevSignedIn: true,
+    };
+  }
 
   return {
     ...clerkUser,
-    isLoaded: true,
-    isSignedIn: true,
-    user: DEV_CLIENT_USER,
-    isDevSignedIn,
+    isLoaded:
+      isDevSignedIn === null && clerkUser.isSignedIn !== true
+        ? false
+        : clerkUser.isLoaded,
+    isSignedIn:
+      isDevSignedIn === null && clerkUser.isSignedIn !== true
+        ? undefined
+        : clerkUser.isSignedIn,
+    isDevSignedIn: false,
   };
 }
 
 export function useAppSignOut() {
   const { signOut } = useClerk();
-  const isDevSignedIn = useDevAuthCookie();
+  const isDevSignedIn = useDevAuthCookie() === true;
 
   return useCallback(
     async ({ redirectUrl = "/" }: { redirectUrl?: string } = {}) => {

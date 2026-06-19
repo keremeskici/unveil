@@ -116,6 +116,7 @@ export async function publishJob(
           postId: post.id,
           label: p.label,
           rect: p.rect,
+          track: p.track ?? null,
           patchMediaKey: p.patchKey,
           position: i,
         })),

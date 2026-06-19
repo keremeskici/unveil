@@ -11,9 +11,15 @@ import { formatUsd } from "@/lib/constants";
 import { useRegionUnlock } from "./useRegionUnlock";
 import { useMediaSync } from "./useMediaSync";
 
+type Rect = { x: number; y: number; w: number; h: number }; // normalized 0..1
+type TrackPoint = { t: number; rect: Rect };
+
 export type PartialRegion = {
   id: string;
-  rect: { x: number; y: number; w: number; h: number }; // normalized 0..1 of source frame
+  rect: Rect; // union bbox over the clip, normalized 0..1 of source frame
+  // Per-frame position track so the tap-button can follow the moving area.
+  // Null/absent → the button sits on the static union rect (legacy behaviour).
+  track?: TrackPoint[] | null;
   unlocked: boolean;
   patchUrl: string | null; // presigned iff already owned
 };
@@ -28,6 +34,11 @@ type Box = { left: number; top: number; width: number; height: number };
  * Region rects are normalized to the *source* frame, so we map them through the
  * same object-cover transform the base video uses (no extra scale on the base,
  * or the math drifts). Recomputed on metadata load and resize.
+ *
+ * When a region carries a `track`, its tap-button follows the blurred area
+ * frame-by-frame: a rAF loop interpolates the track at the base video's
+ * currentTime and moves the button's wrapper imperatively (no React re-render
+ * per frame). The revealed clean crop still sits on the static union rect.
  */
 export function PartialVideoStage({
   postId,
@@ -45,6 +56,8 @@ export function PartialVideoStage({
   const containerRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLVideoElement>(null);
   const patchEls = useRef<Map<string, HTMLVideoElement>>(new Map());
+  // Wrappers for locked region buttons — moved imperatively by the rAF loop.
+  const gateEls = useRef<Map<string, HTMLDivElement>>(new Map());
   const [cover, setCover] = useState<{
     scale: number;
     offX: number;
@@ -106,15 +119,54 @@ export function PartialVideoStage({
     return () => io.disconnect();
   }, []);
 
-  const boxFor = (r: PartialRegion["rect"]): Box | null => {
-    if (!cover) return null;
-    return {
-      left: cover.offX + r.x * cover.srcW * cover.scale,
-      top: cover.offY + r.y * cover.srcH * cover.scale,
-      width: r.w * cover.srcW * cover.scale,
-      height: r.h * cover.srcH * cover.scale,
+  const boxFor = useCallback(
+    (r: Rect): Box | null => {
+      if (!cover) return null;
+      return {
+        left: cover.offX + r.x * cover.srcW * cover.scale,
+        top: cover.offY + r.y * cover.srcH * cover.scale,
+        width: r.w * cover.srcW * cover.scale,
+        height: r.h * cover.srcH * cover.scale,
+      };
+    },
+    [cover],
+  );
+
+  // Drive the tracked buttons: each frame, interpolate the region's track at the
+  // base video's time and write the wrapper's box. Locked + tracked regions only.
+  useEffect(() => {
+    if (!cover) return;
+    const tracked = regions.filter(
+      (r) => r.track && r.track.length > 0 && !revealed[r.id],
+    );
+    if (tracked.length === 0) return;
+
+    let raf = 0;
+    const tick = () => {
+      const v = baseRef.current;
+      if (v && v.videoWidth) {
+        const t = v.currentTime;
+        for (const r of tracked) {
+          const el = gateEls.current.get(r.id);
+          if (!el) continue;
+          const rect = sampleTrack(r.track!, t);
+          const box = rect && boxFor(rect);
+          if (!box) {
+            el.style.visibility = "hidden";
+            continue;
+          }
+          el.style.visibility = "visible";
+          el.style.left = `${box.left}px`;
+          el.style.top = `${box.top}px`;
+          el.style.width = `${box.width}px`;
+          el.style.height = `${box.height}px`;
+        }
+      }
+      raf = requestAnimationFrame(tick);
     };
-  };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [regions, revealed, cover, boxFor]);
 
   return (
     <div
@@ -145,30 +197,46 @@ export function PartialVideoStage({
       />
 
       {regions.map((r) => {
-        const box = boxFor(r.rect);
-        if (!box) return null;
+        // Static union box: the revealed crop's position, and the button's
+        // fallback when there's no per-frame track.
+        const staticBox = boxFor(r.rect);
+        if (!staticBox) return null;
         const url = revealed[r.id];
-        return url ? (
-          <RegionPatch
+        if (url) {
+          return (
+            <RegionPatch
+              key={r.id}
+              box={staticBox}
+              url={url}
+              register={(el) => {
+                if (el) patchEls.current.set(r.id, el);
+                else patchEls.current.delete(r.id);
+              }}
+            />
+          );
+        }
+        const tracked = !!(r.track && r.track.length > 0);
+        return (
+          <div
             key={r.id}
-            box={box}
-            url={url}
-            register={(el) => {
-              if (el) patchEls.current.set(r.id, el);
-              else patchEls.current.delete(r.id);
+            ref={(el) => {
+              if (el) gateEls.current.set(r.id, el);
+              else gateEls.current.delete(r.id);
             }}
-          />
-        ) : (
-          <RegionGate
-            key={r.id}
-            postId={postId}
-            regionId={r.id}
-            price={price}
-            box={box}
-            onUnlock={(signedUrl) =>
-              setRevealed((m) => ({ ...m, [r.id]: signedUrl }))
-            }
-          />
+            className="absolute"
+            // Initial box; the rAF loop owns it for tracked regions thereafter.
+            style={staticBox}
+          >
+            <RegionGate
+              postId={postId}
+              regionId={r.id}
+              price={price}
+              tracked={tracked}
+              onUnlock={(signedUrl) =>
+                setRevealed((m) => ({ ...m, [r.id]: signedUrl }))
+              }
+            />
+          </div>
         );
       })}
 
@@ -181,6 +249,27 @@ export function PartialVideoStage({
       </div>
     </div>
   );
+}
+
+/** Interpolate a region's position track at time `t` (seconds). Clamps to the
+ *  ends; returns null only for an empty track. */
+function sampleTrack(track: TrackPoint[], t: number): Rect | null {
+  if (track.length === 0) return null;
+  if (t <= track[0].t) return track[0].rect;
+  const last = track[track.length - 1];
+  if (t >= last.t) return last.rect;
+  let i = 1;
+  while (i < track.length && track[i].t < t) i++;
+  const a = track[i - 1];
+  const b = track[i];
+  const span = b.t - a.t || 1;
+  const f = (t - a.t) / span;
+  return {
+    x: a.rect.x + (b.rect.x - a.rect.x) * f,
+    y: a.rect.y + (b.rect.y - a.rect.y) * f,
+    w: a.rect.w + (b.rect.w - a.rect.w) * f,
+    h: a.rect.h + (b.rect.h - a.rect.h) * f,
+  };
 }
 
 function RegionPatch({
@@ -215,13 +304,13 @@ function RegionGate({
   postId,
   regionId,
   price,
-  box,
+  tracked,
   onUnlock,
 }: {
   postId: string;
   regionId: string;
   price: string;
-  box: Box;
+  tracked: boolean;
   onUnlock: (signedUrl: string) => void;
 }) {
   const { state, unlock } = useRegionUnlock(postId, regionId, {
@@ -235,13 +324,18 @@ function RegionGate({
       onClick={unlock}
       disabled={pending}
       aria-label={`Reveal this area for $${formatUsd(price)}`}
-      className="absolute flex items-center justify-center transition-transform duration-[140ms] active:scale-[0.97]"
-      style={{ ...box }}
+      className="absolute inset-0 flex items-center justify-center transition-transform duration-[140ms] active:scale-[0.97]"
     >
-      {/* Tap target outline over the blurred region. */}
+      {/* Tap target outline over the blurred region. A solid ring while it
+          tracks the moving area reads as "this follows the blur". */}
       <span
         className="absolute inset-0 rounded-[3px]"
-        style={{ border: "1.5px dashed rgba(255,255,255,.5)", background: "rgba(8,6,8,.18)" }}
+        style={{
+          border: tracked
+            ? "1.5px solid rgba(255,255,255,.7)"
+            : "1.5px dashed rgba(255,255,255,.5)",
+          background: "rgba(8,6,8,.18)",
+        }}
       />
       <span
         className="bg-primary text-primary-fg relative flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-[13px] font-semibold"

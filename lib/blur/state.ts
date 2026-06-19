@@ -33,6 +33,18 @@ function webhookUrl(jobId: string, stage: "detect" | "track" | "cog"): string {
   return `${webhookBase()}/api/blur/webhook?job=${jobId}&stage=${stage}`;
 }
 
+// Replicate validates the webhook at create time and 422s on a non-HTTPS URL
+// (e.g. http://localhost during local dev). When the base isn't HTTPS, omit the
+// webhook entirely and let polling/reconcile (or the dev driver) advance the
+// job — otherwise the prediction can't even be created. In prod the base is
+// HTTPS, so the webhook is attached as normal.
+function webhookFields(jobId: string, stage: "detect" | "track" | "cog") {
+  const url = webhookUrl(jobId, stage);
+  if (!/^https:\/\//i.test(url)) return {} as const;
+  const webhookEvents: Array<"completed"> = ["completed"];
+  return { webhook: url, webhook_events_filter: webhookEvents };
+}
+
 const TTL = 60 * 30; // signed-URL lifetime — must outlive the whole pipeline
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -79,8 +91,7 @@ async function cogStage(jobId: string, rawUrl: string, mediaType: "image" | "vid
       blur_strength: Number(process.env.BLUR_STRENGTH ?? 30),
       feather: Number(process.env.BLUR_FEATHER ?? 16),
     },
-    webhook: webhookUrl(jobId, "cog"),
-    webhook_events_filter: ["completed"],
+    ...webhookFields(jobId, "cog"),
   });
   await updateJob(jobId, { status: "detecting" });
   await addPredictionId(jobId, "cog", pred.id);
@@ -109,8 +120,7 @@ export async function detectStage(
         negative_mask_prompt: NEGATIVE_REGIONS.join(","),
         adjustment_factor: opts.dilation ?? Number(process.env.BLUR_MASK_DILATION ?? 12),
       },
-      webhook: webhookUrl(jobId, "detect"),
-      webhook_events_filter: ["completed"],
+      ...webhookFields(jobId, "detect"),
     });
     await updateJob(jobId, { status: "detecting" });
     await addPredictionId(jobId, "detect", pred.id);
@@ -128,8 +138,7 @@ export async function detectStage(
       text_threshold: 0.25,
       show_visualisation: false,
     },
-    webhook: webhookUrl(jobId, "detect"),
-    webhook_events_filter: ["completed"],
+    ...webhookFields(jobId, "detect"),
   });
   await updateJob(jobId, { status: "detecting", sourceFps: Math.round(fps) });
   await addPredictionId(jobId, "detect", pred.id);
@@ -241,8 +250,7 @@ async function trackStage(job: BlurJob, regions: DetectedRegion[]) {
       output_video: true,
       video_fps: job.sourceFps ?? 30,
     },
-    webhook: webhookUrl(job.id, "track"),
-    webhook_events_filter: ["completed"],
+    ...webhookFields(job.id, "track"),
   });
   await updateJob(job.id, { status: "tracking" });
   await addPredictionId(job.id, "track", pred.id);
@@ -299,7 +307,7 @@ async function onTrackComplete(job: BlurJob, output: unknown) {
     // be published as a normal full-gate post.
     let regionPatches: RegionPatch[] = [];
     try {
-      regionPatches = await buildRegionPatches(job, srcPath, work);
+      regionPatches = await buildRegionPatches(job, srcPath, maskPath, work);
     } catch (e) {
       console.error("[blur] region crop failed (publishing full is still possible):", e);
     }
@@ -325,6 +333,7 @@ async function onTrackComplete(job: BlurJob, output: unknown) {
 async function buildRegionPatches(
   job: BlurJob,
   srcPath: string,
+  maskPath: string,
   work: string,
 ): Promise<RegionPatch[]> {
   const regions = job.regions ?? [];
@@ -360,6 +369,22 @@ async function buildRegionPatches(
       patchKey: blob.pathname,
     });
   }
+
+  // Per-frame position track per region so each tap-button follows its moving
+  // blurred area. Pixels are attributed to a region by its union box. Non-fatal:
+  // a missing track just falls back to the static rect in the player.
+  if (patches.length > 0) {
+    try {
+      const { extractMaskTracks } = await import("./track-extract");
+      const tracks = await extractMaskTracks(maskPath, patches.map((p) => p.rect));
+      patches.forEach((p, i) => {
+        if (tracks[i]?.length) p.track = tracks[i];
+      });
+    } catch (e) {
+      console.error("[blur] mask track extraction failed (static rect used):", e);
+    }
+  }
+
   return patches;
 }
 

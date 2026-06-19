@@ -149,6 +149,7 @@ export default function SearchPage() {
 
   return (
     <main className="flex min-h-dvh flex-1 flex-col">
+      <h1 className="sr-only">Search</h1>
       {/* Header */}
       <header className="bg-surface/80 border-hairline pt-safe sticky top-0 z-40 border-b backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-md items-center gap-2.5 px-4 py-3">
@@ -159,10 +160,15 @@ export default function SearchPage() {
           >
             <ArrowLeft size={22} />
           </Link>
-          <div className="bg-surface-2 border-hairline flex h-11 flex-1 items-center gap-2.5 rounded-pill border px-4">
+          <div className="bg-surface-2 border-hairline flex h-11 flex-1 items-center gap-2.5 rounded-pill border px-4 focus-within:border-[color:var(--primary)]">
             <SearchIcon size={19} className="text-faint shrink-0" />
             <input
               autoFocus
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              aria-label="Search creators, sets, and tags"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search creators, sets, tags…"
@@ -260,6 +266,8 @@ export default function SearchPage() {
             {tiles.map((tile) => (
               <div
                 key={tile.id}
+                role="img"
+                aria-label={tile.locked ? "Locked post" : "Post preview"}
                 className="bg-surface-3 relative aspect-square overflow-hidden rounded-md"
               >
                 {tile.previewUrl && (

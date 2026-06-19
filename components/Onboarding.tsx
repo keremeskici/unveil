@@ -8,6 +8,7 @@ import { Eye, EyeOff, Lock } from "lucide-react";
 
 type AuthMode = "sign-in" | "sign-up";
 type OAuthStrategy = "oauth_google" | "oauth_x";
+type SignUpStep = "credentials" | "verification";
 
 function errorMessage(err: unknown) {
   const clerkError = err as { errors?: { longMessage?: string; message?: string }[] };
@@ -26,10 +27,15 @@ export function Onboarding() {
   const [mode, setMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [signUpStep, setSignUpStep] = useState<SignUpStep>("credentials");
   const [showPw, setShowPw] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const canSubmit = email.trim() !== "" && password !== "" && !isPending;
+  const isVerifyingSignUp = mode === "sign-up" && signUpStep === "verification";
+  const canSubmit = isVerifyingSignUp
+    ? verificationCode.trim() !== "" && !isPending
+    : email.trim() !== "" && password !== "" && !isPending;
 
   useEffect(() => {
     if (isSignedIn) router.replace("/");
@@ -66,9 +72,34 @@ export function Onboarding() {
         if (result.status === "complete") {
           await completeWithSession(result.createdSessionId);
         } else {
-          setError("Check Clerk sign-up settings; this flow needs another verification step.");
+          await signUpState.signUp.prepareEmailAddressVerification({
+            strategy: "email_code",
+          });
+          setSignUpStep("verification");
+          setVerificationCode("");
         }
       }
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  async function submitVerificationCode() {
+    if (!canSubmit || !signUpState.isLoaded) return;
+    setIsPending(true);
+    setError(null);
+    try {
+      const result = await signUpState.signUp.attemptEmailAddressVerification({
+        code: verificationCode.trim(),
+      });
+      if (result.status !== "complete") {
+        throw new Error("Email verification needs another step.");
+      }
+      await signUpState.setActive({ session: result.createdSessionId });
+      router.replace("/");
+      router.refresh();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -149,47 +180,70 @@ export function Onboarding() {
         </h1>
 
         <div className="text-text mb-[13px] text-sm font-semibold">
-          {mode === "sign-in" ? "Log in" : "Create account"}
+          {mode === "sign-in"
+            ? "Log in"
+            : signUpStep === "verification"
+              ? "Verify email"
+              : "Create account"}
         </div>
 
-        <input
-          aria-label="Email"
-          name="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          type="email"
-          autoComplete="email"
-          spellCheck={false}
-          className="bg-surface-2 text-text placeholder:text-faint mb-3.5 h-[54px] w-full rounded-[14px] px-[18px] text-base outline-none focus:border-[color:var(--primary)]"
-          style={{ border: "1px solid var(--hairline-2)" }}
-        />
-
-        <div className="relative mb-[18px]">
+        {isVerifyingSignUp ? (
           <input
-            aria-label="Password"
-            name="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            type={showPw ? "text" : "password"}
-            autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-            className="bg-surface-2 text-text placeholder:text-faint h-[54px] w-full rounded-[14px] pl-[18px] pr-[52px] text-base outline-none focus:border-[color:var(--primary)]"
+            aria-label="Verification code"
+            name="verification-code"
+            value={verificationCode}
+            onChange={(e) => setVerificationCode(e.target.value)}
+            placeholder="Verification code"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            className="bg-surface-2 text-text placeholder:text-faint mb-[18px] h-[54px] w-full rounded-[14px] px-[18px] text-base outline-none focus:border-[color:var(--primary)]"
             style={{ border: "1px solid var(--hairline-2)" }}
           />
-          <button
-            type="button"
-            onClick={() => setShowPw((v) => !v)}
-            aria-label={showPw ? "Hide password" : "Show password"}
-            className="text-faint absolute right-0 top-0 flex h-[54px] w-[50px] items-center justify-center"
-          >
-            {showPw ? <EyeOff size={22} strokeWidth={1.9} /> : <Eye size={22} strokeWidth={1.9} />}
-          </button>
-        </div>
+        ) : (
+          <>
+            <input
+              aria-label="Email"
+              name="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              type="email"
+              autoComplete="email"
+              spellCheck={false}
+              className="bg-surface-2 text-text placeholder:text-faint mb-3.5 h-[54px] w-full rounded-[14px] px-[18px] text-base outline-none focus:border-[color:var(--primary)]"
+              style={{ border: "1px solid var(--hairline-2)" }}
+            />
+
+            <div className="relative mb-[18px]">
+              <input
+                aria-label="Password"
+                name="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                type={showPw ? "text" : "password"}
+                autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                className="bg-surface-2 text-text placeholder:text-faint h-[54px] w-full rounded-[14px] pl-[18px] pr-[52px] text-base outline-none focus:border-[color:var(--primary)]"
+                style={{ border: "1px solid var(--hairline-2)" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                aria-label={showPw ? "Hide password" : "Show password"}
+                className="text-faint absolute right-0 top-0 flex h-[54px] w-[50px] items-center justify-center"
+              >
+                {showPw ? <EyeOff size={22} strokeWidth={1.9} /> : <Eye size={22} strokeWidth={1.9} />}
+              </button>
+            </div>
+          </>
+        )}
+
+        <div id="clerk-captcha" className="mb-3" />
 
         <button
           type="button"
-          onClick={submitEmailPassword}
+          onClick={isVerifyingSignUp ? submitVerificationCode : submitEmailPassword}
           disabled={!canSubmit}
           className="h-[54px] w-full rounded-pill text-[15px] font-bold tracking-[0.04em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985]"
           style={
@@ -198,7 +252,13 @@ export function Onboarding() {
               : { background: "var(--surface-3)", color: "var(--faint)" }
           }
         >
-          {isPending ? "OPENING..." : mode === "sign-in" ? "LOG IN" : "SIGN UP"}
+          {isPending
+            ? "OPENING..."
+            : mode === "sign-in"
+              ? "LOG IN"
+              : isVerifyingSignUp
+                ? "VERIFY EMAIL"
+                : "SIGN UP"}
         </button>
 
         <p className="text-faint mt-3.5 text-[12.5px] leading-[1.55]">
@@ -222,6 +282,8 @@ export function Onboarding() {
             type="button"
             onClick={() => {
               setError(null);
+              setSignUpStep("credentials");
+              setVerificationCode("");
               setMode((current) => (current === "sign-in" ? "sign-up" : "sign-in"));
             }}
             className="hover:text-primary-hover"

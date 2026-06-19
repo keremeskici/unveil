@@ -10,8 +10,11 @@ import { timeAgo } from "@/lib/time";
 import { useAppAuth } from "@/components/useAppAuth";
 import { usePasskeyEnrollment } from "@/components/usePasskeyEnrollment";
 
+type NotifType = "unlock" | "tip" | "comment" | "follow";
+
 type Notif = {
   id: string;
+  type: NotifType;
   actor: string;
   avatar: string | null;
   action: string;
@@ -20,6 +23,13 @@ type Notif = {
   at: string;
 };
 
+const FILTERS: { label: string; match: (t: NotifType) => boolean }[] = [
+  { label: "All", match: () => true },
+  { label: "Unveils", match: (t) => t === "unlock" },
+  { label: "Tips", match: (t) => t === "tip" },
+  { label: "Mentions", match: (t) => t === "comment" },
+];
+
 export default function NotificationsPage() {
   const { isSignedIn } = useAppAuth();
   const connected = isSignedIn === true;
@@ -27,6 +37,7 @@ export default function NotificationsPage() {
   // Local-only synthetic notification — never returned by /api/notifications.
   const showPasskeyNotif = passkey.canEnroll && !passkey.isDismissed;
   const [items, setItems] = useState<Notif[] | null>(null);
+  const [filter, setFilter] = useState("All");
 
   useEffect(() => {
     if (!connected) return;
@@ -40,6 +51,9 @@ export default function NotificationsPage() {
       live = false;
     };
   }, [connected]);
+
+  const active = FILTERS.find((f) => f.label === filter) ?? FILTERS[0];
+  const visible = items ? items.filter((n) => active.match(n.type)) : null;
 
   return (
     <main className="flex min-h-dvh flex-1 flex-col">
@@ -63,7 +77,38 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <>
-            {showPasskeyNotif && (
+            {/* Filter chips */}
+            <div className="border-hairline flex gap-2.5 overflow-x-auto border-b px-[18px] py-3.5">
+              {FILTERS.map((f) => {
+                const on = f.label === filter;
+                return (
+                  <button
+                    key={f.label}
+                    type="button"
+                    onClick={() => setFilter(f.label)}
+                    className="shrink-0 rounded-pill px-4 py-2 text-[13.5px] transition-transform active:scale-95"
+                    style={
+                      on
+                        ? {
+                            background: "var(--tint)",
+                            border: "1px solid rgba(194,20,59,.35)",
+                            color: "var(--text)",
+                            fontWeight: 600,
+                          }
+                        : {
+                            background: "var(--surface-2)",
+                            border: "1px solid transparent",
+                            color: "var(--muted)",
+                          }
+                    }
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {showPasskeyNotif && filter === "All" && (
               <ul className="px-[18px]">
                 <PasskeyNotifRow
                   isPending={passkey.isPending}
@@ -73,10 +118,10 @@ export default function NotificationsPage() {
                 />
               </ul>
             )}
-            {items === null ? (
+            {visible === null ? (
               <p className="text-faint mt-16 text-center text-sm">Loading…</p>
-            ) : items.length === 0 ? (
-              showPasskeyNotif ? null : (
+            ) : visible.length === 0 ? (
+              showPasskeyNotif && filter === "All" ? null : (
                 <div className="mt-10">
                   <EmptyState
                     icon={Bell}
@@ -87,7 +132,7 @@ export default function NotificationsPage() {
               )
             ) : (
               <ul className="px-[18px]">
-                {items.map((n) => (
+                {visible.map((n) => (
                   <li
                     key={n.id}
                     className="border-hairline flex items-center gap-3.5 border-b py-3.5"
@@ -96,19 +141,23 @@ export default function NotificationsPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-[14.5px] leading-snug">
                         <span className="font-semibold">{n.actor}</span>{" "}
-                        <span className="text-muted">{n.action} </span>
-                        <span className="text-text">“{n.postTitle}”</span>
+                        <span className="text-muted">{n.action}</span>
+                        {n.postTitle && (
+                          <span className="text-text"> “{n.postTitle}”</span>
+                        )}
                       </p>
                       <p className="text-faint mt-0.5 text-[12px]">
                         {timeAgo(n.at)}
                       </p>
                     </div>
-                    <span
-                      className="tabular text-[12.5px]"
-                      style={{ color: "var(--success)" }}
-                    >
-                      {n.amount}
-                    </span>
+                    {n.amount && (
+                      <span
+                        className="tabular text-[12.5px]"
+                        style={{ color: "var(--success)" }}
+                      >
+                        {n.amount}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

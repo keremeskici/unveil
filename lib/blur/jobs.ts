@@ -6,6 +6,8 @@ import {
   blurCostLog,
   blurStatusEnum,
   posts,
+  postRegions,
+  type RegionPatch,
 } from "@/lib/db/schema";
 
 // Non-terminal states a job can get stuck in if a webhook is missed.
@@ -72,7 +74,7 @@ export async function addPredictionId(id: string, stage: string, predictionId: s
  */
 export async function publishJob(
   jobId: string,
-  opts: { title?: string; unlockPrice?: string } = {},
+  opts: { title?: string; unlockPrice?: string; accessMode?: "full" | "partial" } = {},
 ) {
   return getDb().transaction(async (tx) => {
     const job = await tx.query.blurJobs.findFirst({ where: eq(blurJobs.id, jobId) });
@@ -86,6 +88,14 @@ export async function publishJob(
     const title = opts.title?.trim() || job.draftTitle || "Untitled";
     const unlockPrice = opts.unlockPrice || job.draftPrice || "0.05";
 
+    // Partial publishing requires crops produced during tracking. If the creator
+    // asks for partial but there are none, fall back to a normal full-gate post.
+    const patches = (job.regionPatches ?? []) as RegionPatch[];
+    const partial =
+      opts.accessMode === "partial" &&
+      job.mediaType === "video" &&
+      patches.length > 0;
+
     const [post] = await tx
       .insert(posts)
       .values({
@@ -95,9 +105,22 @@ export async function publishJob(
         privateMediaKey: job.originalBlobKey ?? job.rawBlobKey,
         unlockPrice,
         mediaType: job.mediaType,
+        accessMode: partial ? "partial" : "full",
         isPublished: true,
       })
       .returning();
+
+    if (partial) {
+      await tx.insert(postRegions).values(
+        patches.map((p, i) => ({
+          postId: post.id,
+          label: p.label,
+          rect: p.rect,
+          patchMediaKey: p.patchKey,
+          position: i,
+        })),
+      );
+    }
 
     const [updated] = await tx
       .update(blurJobs)

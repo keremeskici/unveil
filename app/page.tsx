@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { Database, Sparkles } from "lucide-react";
-import { getFeed } from "@/lib/db/queries";
-import { isCurrentAppUserAuthenticated } from "@/lib/app-user";
+import { getFeed, getPostRegionsWithUnlocks } from "@/lib/db/queries";
+import { getFeedSocial } from "@/lib/db/social";
+import {
+  getCurrentAppUser,
+  isCurrentAppUserAuthenticated,
+} from "@/lib/app-user";
 import { presignPrivateGet } from "@/lib/blob";
 import { PostCard, type FeedPost } from "@/components/PostCard";
 import { TopBar } from "@/components/TopBar";
+import { ConnectButton } from "@/components/ConnectButton";
 import { BottomNav } from "@/components/BottomNav";
 import { EmptyState } from "@/components/EmptyState";
 import { Onboarding } from "@/components/Onboarding";
@@ -14,21 +19,48 @@ export const dynamic = "force-dynamic";
 
 async function loadFeed(): Promise<FeedPost[] | null> {
   try {
-    const rows = await getFeed(20, 0);
+    const [rows, fan] = await Promise.all([getFeed(20, 0), getCurrentAppUser()]);
+    const social = await getFeedSocial(
+      rows.map((p) => p.id),
+      fan?.id,
+    );
     return await Promise.all(
-      rows.map(async (p) => ({
-        id: p.id,
-        title: p.title,
-        // Preview blob is private; presign with a long TTL for the feed.
-        blurredPreviewUrl: await presignPrivateGet(p.blurredPreviewUrl, 3600),
-        unlockPrice: p.unlockPrice,
-        mediaType: p.mediaType,
-        creator: {
-          username: p.creator?.username ?? null,
-          avatar: p.creator?.avatar ?? null,
-          wallet: p.creator?.walletAddress ?? null,
-        },
-      })),
+      rows.map(async (p) => {
+        const post: FeedPost = {
+          id: p.id,
+          title: p.title,
+          // Preview blob is private; presign with a long TTL for the feed.
+          blurredPreviewUrl: await presignPrivateGet(p.blurredPreviewUrl, 3600),
+          poster: p.posterKey ? await presignPrivateGet(p.posterKey, 3600) : null,
+          unlockPrice: p.unlockPrice,
+          mediaType: p.mediaType,
+          accessMode: p.accessMode,
+          createdAt: p.createdAt?.toISOString(),
+          social: social.get(p.id),
+          creator: {
+            username: p.creator?.username ?? null,
+            avatar: p.creator?.avatar ?? null,
+            wallet: p.creator?.walletAddress ?? null,
+          },
+        };
+
+        // Partial posts carry their regions; presign the crops the fan owns.
+        if (p.accessMode === "partial") {
+          const regions = await getPostRegionsWithUnlocks(p.id, fan?.id);
+          post.regions = await Promise.all(
+            regions.map(async (r) => ({
+              id: r.id,
+              rect: r.rect,
+              unlocked: r.unlocked,
+              patchUrl: r.patchMediaKey
+                ? await presignPrivateGet(r.patchMediaKey, 3600)
+                : null,
+            })),
+          );
+        }
+
+        return post;
+      }),
     );
   } catch {
     // DB not provisioned yet — show the empty state instead of crashing.
@@ -44,7 +76,9 @@ export default async function FeedPage() {
 
   return (
     <main className="flex min-h-dvh flex-1 flex-col">
-      <TopBar />
+      <TopBar>
+        <ConnectButton />
+      </TopBar>
 
       <div className="mx-auto w-full max-w-md flex-1 px-3.5 pt-3.5 pb-28">
         {/* Composer */}

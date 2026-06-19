@@ -5,6 +5,8 @@ import {
   custodialLedger,
   loyaltyLedger,
   paymentDeposits,
+  regionUnlocks,
+  tips,
   unlocks,
   userBalances,
   users,
@@ -906,6 +908,291 @@ export async function finalizeCustodialUnlockPaymentHash({
           eq(unlocks.fanId, userId),
           eq(unlocks.postId, postId),
           eq(unlocks.paymentTxHash, internalTxHash),
+        ),
+      )
+      .returning();
+
+    if (!unlock) return;
+
+    await tx
+      .update(loyaltyLedger)
+      .set({ txHash: paymentTxHash })
+      .where(eq(loyaltyLedger.referenceId, unlock.id));
+  });
+}
+
+// ── Tips (fan → creator) ──────────────────────────────────────────────────────
+// A tip is an internal custodial-balance transfer: the fan is debited and the
+// creator credited the full amount, atomically, in one transaction. Mirrors the
+// unlock ledger pattern but the counterparty is another user's balance rather
+// than the platform wallet.
+
+export type CustodialTipResult =
+  | { status: "sent"; txHash: string; balance: string }
+  | { status: "insufficient_funds"; balance: string; required: string }
+  | { status: "self_tip" };
+
+export async function tipWithCustodialBalance({
+  fanId,
+  creatorId,
+  postId,
+  amount,
+  message,
+  settlementMs,
+}: {
+  fanId: string;
+  creatorId: string;
+  postId?: string | null;
+  amount: string;
+  message?: string | null;
+  settlementMs: number;
+}): Promise<CustodialTipResult> {
+  if (fanId === creatorId) return { status: "self_tip" };
+
+  return getDb().transaction(async (tx) => {
+    await tx.insert(userBalances).values({ userId: fanId }).onConflictDoNothing();
+
+    // Debit the fan, guarded so a concurrent spend can't overdraw the balance.
+    const [fanBalance] = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} - ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(userBalances.userId, fanId),
+          sql`${userBalances.availableBalance} >= ${amount}`,
+        ),
+      )
+      .returning();
+
+    if (!fanBalance) {
+      const current = await tx.query.userBalances.findFirst({
+        where: eq(userBalances.userId, fanId),
+      });
+      return {
+        status: "insufficient_funds",
+        balance: current?.availableBalance ?? "0",
+        required: amount,
+      };
+    }
+
+    const txHash = internalTxHash();
+
+    await tx.insert(custodialLedger).values({
+      userId: fanId,
+      eventType: "tip_debit",
+      amount: `-${amount}`,
+      balanceAfter: fanBalance.availableBalance,
+      postId: postId ?? null,
+      reference: txHash,
+    });
+
+    // Credit the creator the full amount.
+    await tx
+      .insert(userBalances)
+      .values({ userId: creatorId })
+      .onConflictDoNothing();
+    const [creatorBalance] = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userBalances.userId, creatorId))
+      .returning();
+
+    await tx.insert(custodialLedger).values({
+      userId: creatorId,
+      eventType: "tip_credit",
+      amount,
+      balanceAfter: creatorBalance.availableBalance,
+      postId: postId ?? null,
+      reference: `${txHash}:credit`,
+    });
+
+    const [tip] = await tx
+      .insert(tips)
+      .values({
+        fanId,
+        creatorId,
+        postId: postId ?? null,
+        amount,
+        message: message ?? null,
+        paymentTxHash: txHash,
+        settlementMs,
+      })
+      .returning();
+
+    // The fan earns loyalty points for the gesture, like any spend.
+    await tx.insert(loyaltyLedger).values({
+      userId: fanId,
+      amount: String(POINTS_PER_UNLOCK),
+      eventType: "tip",
+      referenceId: tip.id,
+      txHash,
+    });
+
+    return { status: "sent", txHash, balance: fanBalance.availableBalance };
+  });
+}
+
+// ── Per-region unlocks (partial posts) ───────────────────────────────────────
+// Exact mirror of the post-unlock trio above, keyed on (fanId, postRegionId).
+// Every region is charged the single `posts.unlockPrice`. The ledger row still
+// carries the parent postId for creator-payout attribution.
+
+export type CustodialRegionUnlockResult =
+  | { status: "already_unlocked"; txHash?: string }
+  | { status: "unlocked"; txHash: string; balance: string }
+  | { status: "insufficient_funds"; balance: string; required: string };
+
+export async function unlockRegionWithCustodialBalance({
+  userId,
+  postId,
+  postRegionId,
+  amount,
+  settlementMs,
+}: {
+  userId: string;
+  postId: string;
+  postRegionId: string;
+  amount: string;
+  settlementMs: number;
+}): Promise<CustodialRegionUnlockResult> {
+  return getDb().transaction(async (tx) => {
+    const existing = await tx.query.regionUnlocks.findFirst({
+      where: and(
+        eq(regionUnlocks.fanId, userId),
+        eq(regionUnlocks.postRegionId, postRegionId),
+      ),
+    });
+    if (existing) {
+      return { status: "already_unlocked", txHash: existing.paymentTxHash };
+    }
+
+    await tx.insert(userBalances).values({ userId }).onConflictDoNothing();
+
+    const [balance] = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} - ${amount}`,
+        escrowedBalance: sql`${userBalances.escrowedBalance} + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(userBalances.userId, userId),
+          sql`${userBalances.availableBalance} >= ${amount}`,
+        ),
+      )
+      .returning();
+
+    if (!balance) {
+      const current = await tx.query.userBalances.findFirst({
+        where: eq(userBalances.userId, userId),
+      });
+      return {
+        status: "insufficient_funds",
+        balance: current?.availableBalance ?? "0",
+        required: amount,
+      };
+    }
+
+    const txHash = internalTxHash();
+
+    await tx.insert(custodialLedger).values({
+      userId,
+      eventType: "unlock_debit",
+      amount: `-${amount}`,
+      balanceAfter: balance.availableBalance,
+      postId,
+      reference: txHash,
+    });
+
+    const [unlock] = await tx
+      .insert(regionUnlocks)
+      .values({
+        fanId: userId,
+        postRegionId,
+        paymentTxHash: txHash,
+        amountPaid: amount,
+        settlementMs,
+      })
+      .returning();
+
+    await tx.insert(loyaltyLedger).values({
+      userId,
+      amount: String(POINTS_PER_UNLOCK),
+      eventType: "post_unlock",
+      referenceId: unlock.id,
+      txHash,
+    });
+
+    return { status: "unlocked", txHash, balance: balance.availableBalance };
+  });
+}
+
+export async function rollbackCustodialRegionUnlock({
+  userId,
+  postRegionId,
+  amount,
+  txHash,
+}: {
+  userId: string;
+  postRegionId: string;
+  amount: string;
+  txHash: string;
+}) {
+  return getDb().transaction(async (tx) => {
+    const unlock = await tx.query.regionUnlocks.findFirst({
+      where: and(
+        eq(regionUnlocks.fanId, userId),
+        eq(regionUnlocks.postRegionId, postRegionId),
+        eq(regionUnlocks.paymentTxHash, txHash),
+      ),
+    });
+    if (!unlock) return null;
+
+    await tx.delete(loyaltyLedger).where(eq(loyaltyLedger.referenceId, unlock.id));
+    await tx.delete(regionUnlocks).where(eq(regionUnlocks.id, unlock.id));
+    await tx.delete(custodialLedger).where(eq(custodialLedger.reference, txHash));
+
+    const [balance] = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+        escrowedBalance: sql`${userBalances.escrowedBalance} - ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userBalances.userId, userId))
+      .returning();
+
+    return balance;
+  });
+}
+
+export async function finalizeCustodialRegionUnlockPaymentHash({
+  userId,
+  postRegionId,
+  internalTxHash: internalHash,
+  paymentTxHash,
+}: {
+  userId: string;
+  postRegionId: string;
+  internalTxHash: string;
+  paymentTxHash: string;
+}) {
+  await getDb().transaction(async (tx) => {
+    const [unlock] = await tx
+      .update(regionUnlocks)
+      .set({ paymentTxHash })
+      .where(
+        and(
+          eq(regionUnlocks.fanId, userId),
+          eq(regionUnlocks.postRegionId, postRegionId),
+          eq(regionUnlocks.paymentTxHash, internalHash),
         ),
       )
       .returning();

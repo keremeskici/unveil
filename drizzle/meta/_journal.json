@@ -22,6 +22,27 @@
       "when": 1781863296430,
       "tag": "0002_tempo_custodial_wallet_funding",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781866129423,
+      "tag": "0003_melted_pretty_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781867437981,
+      "tag": "0004_safe_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781874792530,
+      "tag": "0005_real_zuras",
+      "breakpoints": true
     }
   ]
 }

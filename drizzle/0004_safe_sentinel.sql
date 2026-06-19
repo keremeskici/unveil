@@ -1,0 +1,1 @@
+ALTER TABLE "blur_jobs" ADD COLUMN "region_patches" jsonb DEFAULT '[]'::jsonb;

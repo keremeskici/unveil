@@ -17,6 +17,11 @@ import { relations } from "drizzle-orm";
 
 export const mediaTypeEnum = pgEnum("media_type", ["image", "video"]);
 
+// How a post is gated. "full" = the whole asset is locked behind one unlock
+// (today's behaviour). "partial" = the blurred clip plays free and each blurred
+// region is an independent micro-unlock. See docs/media-player-implementation.md.
+export const accessModeEnum = pgEnum("access_mode", ["full", "partial"]);
+
 export const loyaltyEventTypeEnum = pgEnum("loyalty_event_type", [
   "post_unlock",
   "tip",
@@ -32,6 +37,9 @@ export const custodialLedgerTypeEnum = pgEnum("custodial_ledger_type", [
   "unlock_debit",
   "withdrawal",
   "refund",
+  // A tip moves balance fan → creator: the fan is debited, the creator credited.
+  "tip_debit",
+  "tip_credit",
 ]);
 
 export const platformKeyStatusEnum = pgEnum("platform_key_status", [
@@ -93,9 +101,14 @@ export const posts = pgTable(
     blurredPreviewUrl: text("blurred_preview_url").notNull(),
     // Private full media — stored in Supabase Storage (private), URL/key only
     privateMediaKey: text("private_media_key").notNull(),
-    // Price in stablecoin units. e.g. "0.05" = 5 cents
+    // Price in stablecoin units. e.g. "0.05" = 5 cents. For a "partial" post this
+    // is the single price charged for EACH region reveal (no per-region price).
     unlockPrice: decimal("unlock_price", { precision: 18, scale: 8 }).notNull(),
     mediaType: mediaTypeEnum("media_type").notNull().default("image"),
+    accessMode: accessModeEnum("access_mode").notNull().default("full"),
+    // Blurred poster frame for video (private pathname; presigned for the feed).
+    posterKey: text("poster_key"),
+    durationMs: integer("duration_ms"), // video only — for the scrubber / preloading
     isPublished: boolean("is_published").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -131,6 +144,59 @@ export const unlocks = pgTable(
     // a fan can only unlock a given post once
     uniqueIndex("unlocks_fan_post_uniq").on(t.fanId, t.postId),
     index("unlocks_fan_idx").on(t.fanId),
+  ],
+);
+
+// ── post_regions ──────────────────────────────────────────────────────────────
+// One row per independently-priced blurred region on a "partial" post. The
+// fully-blurred clip plays free; each region overlays a clean crop once unlocked.
+// Price is NOT stored here — every region costs `posts.unlockPrice`.
+export type RegionRect = { x: number; y: number; w: number; h: number }; // normalized 0..1
+
+export const postRegions = pgTable(
+  "post_regions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    label: varchar("label", { length: 64 }).notNull(), // server-side only; never shown raw
+    // Union bbox across all frames, normalized 0..1 so it scales to any size.
+    rect: jsonb("rect").$type<RegionRect>().notNull(),
+    // Private clean crop of just this region. Presigned on unlock.
+    patchMediaKey: text("patch_media_key").notNull(),
+    position: integer("position").notNull().default(0), // stacking / button order
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("post_regions_post_idx").on(t.postId)],
+);
+
+// ── region_unlocks ──────────────────────────────────────────────────────────
+// Per-region equivalent of `unlocks`. Separate table because `unlocks` is unique
+// on (fanId, postId) and keeps meaning "owns the whole post".
+export const regionUnlocks = pgTable(
+  "region_unlocks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    fanId: uuid("fan_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    postRegionId: uuid("post_region_id")
+      .notNull()
+      .references(() => postRegions.id, { onDelete: "cascade" }),
+    paymentTxHash: varchar("payment_tx_hash", { length: 66 }).notNull(),
+    amountPaid: decimal("amount_paid", { precision: 18, scale: 8 }).notNull(),
+    settlementMs: integer("settlement_ms"),
+    unlockedAt: timestamp("unlocked_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    // a fan can only unlock a given region once
+    uniqueIndex("region_unlocks_fan_region_uniq").on(t.fanId, t.postRegionId),
+    index("region_unlocks_fan_idx").on(t.fanId),
   ],
 );
 
@@ -231,6 +297,15 @@ export type DetectedRegion = {
   frame?: number; // video only
 };
 
+// A per-region clean crop produced during tracking, consumed by publishJob when
+// the creator picks "partial". `rect` is the crop's normalized 0..1 position in
+// the source frame and MUST match the crop exactly so overlays align.
+export type RegionPatch = {
+  label: string;
+  rect: RegionRect;
+  patchKey: string; // private pathname of the cropped clean clip
+};
+
 export const blurJobs = pgTable(
   "blur_jobs",
   {
@@ -257,6 +332,8 @@ export const blurJobs = pgTable(
       .default({}),
     detectionConfidence: numeric("detection_confidence"), // drives fail-closed routing
     regions: jsonb("regions").$type<DetectedRegion[]>().default([]),
+    // Per-region clean crops for optional partial-reveal publishing (video only).
+    regionPatches: jsonb("region_patches").$type<RegionPatch[]>().default([]),
     sourceFps: integer("source_fps"), // video only — so the mask track matches
 
     error: text("error"),
@@ -441,6 +518,148 @@ export const custodialWallets = pgTable(
   ],
 );
 
+// ── post_likes ────────────────────────────────────────────────────────────────
+// One row per (post, user) like. Counts are derived, not denormalized.
+export const postLikes = pgTable(
+  "post_likes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("post_likes_post_user_uniq").on(t.postId, t.userId),
+    index("post_likes_post_idx").on(t.postId),
+  ],
+);
+
+// ── post_saves (bookmarks) ────────────────────────────────────────────────────
+export const postSaves = pgTable(
+  "post_saves",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("post_saves_post_user_uniq").on(t.postId, t.userId),
+    index("post_saves_user_idx").on(t.userId),
+  ],
+);
+
+// ── comments ──────────────────────────────────────────────────────────────────
+// Single-level threading: a reply carries `parentId` pointing at the top-level
+// comment it answers. `isPinned` surfaces a creator-pinned comment first.
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id"), // self-ref; null for top-level comments
+    body: text("body").notNull(),
+    isPinned: boolean("is_pinned").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("comments_post_idx").on(t.postId, t.createdAt),
+    index("comments_parent_idx").on(t.parentId),
+  ],
+);
+
+// ── comment_likes ─────────────────────────────────────────────────────────────
+export const commentLikes = pgTable(
+  "comment_likes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    commentId: uuid("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("comment_likes_comment_user_uniq").on(t.commentId, t.userId),
+    index("comment_likes_comment_idx").on(t.commentId),
+  ],
+);
+
+// ── follows ───────────────────────────────────────────────────────────────────
+// `followerId` follows `followingId`. A fan's "Following" count and a creator's
+// "Fans" count both derive from this table.
+export const follows = pgTable(
+  "follows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    followerId: uuid("follower_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    followingId: uuid("following_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("follows_pair_uniq").on(t.followerId, t.followingId),
+    index("follows_following_idx").on(t.followingId),
+  ],
+);
+
+// ── tips ──────────────────────────────────────────────────────────────────────
+// A direct fan → creator payment outside the unlock flow. Settled against the
+// custodial balance ledger (tip_debit / tip_credit). `postId` is the post the
+// tip was sent from, when applicable.
+export const tips = pgTable(
+  "tips",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    fanId: uuid("fan_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    creatorId: uuid("creator_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    postId: uuid("post_id").references(() => posts.id, { onDelete: "set null" }),
+    amount: decimal("amount", { precision: 18, scale: 8 }).notNull(),
+    message: text("message"),
+    paymentTxHash: varchar("payment_tx_hash", { length: 66 }).notNull(),
+    settlementMs: integer("settlement_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("tips_creator_idx").on(t.creatorId, t.createdAt),
+    index("tips_fan_idx").on(t.fanId),
+  ],
+);
+
 // ── Relations ────────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ one, many }) => ({
   posts: many(posts),
@@ -460,6 +679,20 @@ export const postsRelations = relations(posts, ({ one, many }) => ({
   creator: one(users, { fields: [posts.creatorId], references: [users.id] }),
   unlocks: many(unlocks),
   blurJobs: many(blurJobs),
+  regions: many(postRegions),
+}));
+
+export const postRegionsRelations = relations(postRegions, ({ one, many }) => ({
+  post: one(posts, { fields: [postRegions.postId], references: [posts.id] }),
+  unlocks: many(regionUnlocks),
+}));
+
+export const regionUnlocksRelations = relations(regionUnlocks, ({ one }) => ({
+  fan: one(users, { fields: [regionUnlocks.fanId], references: [users.id] }),
+  region: one(postRegions, {
+    fields: [regionUnlocks.postRegionId],
+    references: [postRegions.id],
+  }),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -503,4 +736,38 @@ export const paymentDepositsRelations = relations(paymentDeposits, ({ one }) => 
 
 export const custodialWalletsRelations = relations(custodialWallets, ({ one }) => ({
   user: one(users, { fields: [custodialWallets.userId], references: [users.id] }),
+}));
+
+export const commentsRelations = relations(comments, ({ one, many }) => ({
+  post: one(posts, { fields: [comments.postId], references: [posts.id] }),
+  author: one(users, { fields: [comments.userId], references: [users.id] }),
+  parent: one(comments, {
+    fields: [comments.parentId],
+    references: [comments.id],
+    relationName: "comment_replies",
+  }),
+  replies: many(comments, { relationName: "comment_replies" }),
+  likes: many(commentLikes),
+}));
+
+export const commentLikesRelations = relations(commentLikes, ({ one }) => ({
+  comment: one(comments, {
+    fields: [commentLikes.commentId],
+    references: [comments.id],
+  }),
+  user: one(users, { fields: [commentLikes.userId], references: [users.id] }),
+}));
+
+export const tipsRelations = relations(tips, ({ one }) => ({
+  fan: one(users, { fields: [tips.fanId], references: [users.id] }),
+  creator: one(users, { fields: [tips.creatorId], references: [users.id] }),
+  post: one(posts, { fields: [tips.postId], references: [posts.id] }),
+}));
+
+export const followsRelations = relations(follows, ({ one }) => ({
+  follower: one(users, { fields: [follows.followerId], references: [users.id] }),
+  following: one(users, {
+    fields: [follows.followingId],
+    references: [users.id],
+  }),
 }));

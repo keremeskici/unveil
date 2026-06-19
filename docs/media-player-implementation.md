@@ -19,6 +19,24 @@ Three capabilities, mapped to the request:
 
 F1 + F2 are a moderate extension of what already exists. **F3 is the genuinely new architecture** and most of the risk lives there (mobile video decoders, A/V sync, per-region payments). The plan ships them in that order.
 
+### 1.1 Hackathon scope lock (confirmed constraints)
+
+These constraints are **decided** and the plan below is tuned to them — they retire most of the hard pitfalls:
+
+- **Clips are ≤ 7–8 seconds**, single short MP4.
+- **Partial posts carry ~2 priced regions** (cap at 2–3; don't build for N).
+- **F3 (partial reveal) is in demo scope** alongside full-gate video.
+
+What this lets us drop / simplify:
+
+| Concern | Why it's no longer a risk at this scale | Decision |
+|---|---|---|
+| iOS concurrent decoder ceiling | 1 base + 2 patches = **3 decoders** — fine on any modern iPhone | **Option A confirmed**; drop the Option B recomposite fallback |
+| Signed-URL expiry mid-playback | 300s TTL ≫ 8s clip; whole file buffers in the first range request and loops from memory | Direct presigned URLs are acceptable for the demo; the redirect route (§7) becomes a **robustness nice-to-have, not a blocker** |
+| A/V sync drift | Negligible over 8s; clips can `preload="auto"` fully and stay frame-stable | rVFC drift correction stays (cheap) but is not load-bearing |
+| HLS / adaptive bitrate | Pointless for an 8s clip | **Out.** Progressive MP4 only |
+| Region clustering complexity | Only ~2 regions to separate | Trivial — no general N-region clustering needed |
+
 ---
 
 ## 2. What already exists (don't rebuild this)
@@ -145,7 +163,7 @@ On unlock, ffmpeg produces a new derivative with the paid region(s) un-blurred a
 - **Pro:** always exactly one `<video>`; no client sync; trivially secure.
 - **Con:** seconds of latency per tap (kills the instant reveal), real GPU/CPU cost per unlock, source swap is visible. Combinatorial if regions unlock in any order (cache by unlocked-set).
 
-**Recommendation: Option A**, with a hard cap of **≤3–4 priced regions per clip** for v1 (also a better UX — a clip peppered with 9 buttons is noise). Keep Option B documented as the fallback if mobile decoder testing fails.
+**Decision: Option A** (confirmed by the §1.1 scope lock). With ~2 regions on an 8s clip we have at most **3 concurrent decoders** and trivial sync — the decoder ceiling that would have motivated Option B doesn't bind here. Cap priced regions at **2–3** (also better UX). Option B (server recomposite) is **dropped** for the hackathon; revisit only if we ever go to many-region or long-form clips.
 
 ### 6.2 Data model changes
 
@@ -170,7 +188,8 @@ export const postRegions = pgTable("post_regions", {
   track: jsonb("track").$type<{ frame: number; box: [number, number, number, number] }[]>(),
   // Private clean crop of just this region (Option A). Presigned on unlock.
   patchMediaKey: text("patch_media_key").notNull(),
-  unlockPrice: decimal("unlock_price", { precision: 18, scale: 8 }).notNull(),
+  // NOTE: no per-region price. The creator sets ONE price on the post
+  // (`posts.unlockPrice`) and every region costs that same amount to reveal.
   position: integer("position").notNull().default(0),       // button stacking / order
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("post_regions_post_idx").on(t.postId)]);
@@ -207,7 +226,7 @@ Creator chooses, at review time, **full vs partial** and sets a price per region
 ### 6.4 Per-region unlock API + payment
 
 - **New route `app/api/unlock/region/route.ts`** — POST `{ postId, regionId }`.
-  - Mirror `app/api/unlock/route.ts`: `requireCurrentAppUser()` → load `post_region` (verify it belongs to `postId`) → `unlockRegionWithCustodialBalance()` (new, mirrors `unlockWithCustodialBalance` but writes `region_unlocks` and keys idempotency on `(fanId, postRegionId)`) → `settleUnlockWithCustodialWallet({ amountUsd: region.unlockPrice, reference })` → return a **stream-route URL** for `patchMediaKey` (TTL 300, video).
+  - Mirror `app/api/unlock/route.ts`: `requireCurrentAppUser()` → load `post_region` (verify it belongs to `postId`) → `unlockRegionWithCustodialBalance()` (new, mirrors `unlockWithCustodialBalance` but writes `region_unlocks` and keys idempotency on `(fanId, postRegionId)`) → `settleUnlockWithCustodialWallet({ amountUsd: post.unlockPrice, reference })` (the **single post price** is charged per region) → return a **stream-route URL** for `patchMediaKey` (TTL 300, video).
   - Reuse `settleUnlockWithCustodialWallet` as-is (it's per-amount, reference-keyed). Add `unlockRegionWithCustodialBalance` / `rollbackCustodialRegionUnlock` / `finalize…` in `lib/custodial.ts` paralleling the post versions.
 - **Loyalty:** region unlocks award points too (reuse `POINTS_PER_UNLOCK` or a smaller per-region value).
 
@@ -236,7 +255,9 @@ Creator chooses, at review time, **full vs partial** and sets a price per region
 
 ## 7. Streaming, signing & range requests
 
-**Problem:** a signed URL with a 300s TTL placed directly in `<video src>` breaks when the user pauses >5 min and then seeks — the browser opens a *new* range request to an expired URL → 403, playback dies. Proxying the bytes through a Next route handler fixes auth but burns our function bandwidth/time on every video.
+> **Scope note:** at ≤8s clips this is a *robustness* improvement, not a demo blocker (see §1.1). An 8s file buffers in the first range request and loops from memory, well inside the 300s TTL — direct presigned URLs work for the demo. Build the redirect route if time allows or before any longer-form content; otherwise ship direct presigned URLs from `/api/unlock` (full) and the feed query (base), and a presigned URL from `/api/unlock/region` (patch).
+
+**Problem (general case):** a signed URL with a 300s TTL placed directly in `<video src>` breaks when the user pauses >5 min and then seeks — the browser opens a *new* range request to an expired URL → 403, playback dies. Proxying the bytes through a Next route handler fixes auth but burns our function bandwidth/time on every video.
 
 **Solution — a thin redirect route** (`app/api/media/[postId]/route.ts`, and `[postId]/[regionId]`):
 
@@ -261,7 +282,7 @@ Notes:
 
 **Mobile / iOS Safari (this is a PWA — assume iPhone first):**
 - **Autoplay requires `muted` + `playsInline`.** Without `playsInline`, iOS hijacks into native fullscreen on play. Without `muted`, autoplay is blocked entirely. Feed previews must be muted-autoplay; sound only after a user gesture.
-- **Concurrent video decoders are limited** on iOS (a handful, device-dependent, and memory-pressured). This is the top risk for F3 Option A. Mitigations: cap priced regions (≤3–4); **lazy-mount a patch `<video>` only after its unlock**; consider releasing decoders for off-screen feed items (`src=""` / unmount when scrolled away); if testing fails, fall back to Option B (server recomposite).
+- **Concurrent video decoders are limited** on iOS (a handful, device-dependent, and memory-pressured). At our scope (1 base + 2 patches = 3) this is comfortably fine, but the discipline still matters as the feed scrolls: **lazy-mount a patch `<video>` only after its unlock**, and **release decoders for off-screen feed items** (`src=""` / unmount + pause on scroll-away via IntersectionObserver) so a long feed of videos doesn't accumulate live decoders.
 - **Low Power Mode** pauses/blocks autoplay — show the poster + a play affordance, never assume autoplay succeeded (`play()` returns a promise; handle rejection).
 
 **A/V sync (F3):**
@@ -294,40 +315,61 @@ Notes:
 
 ## 9. Phased rollout
 
+> **Build status (updated):** the entire app-layer slice for F1/F2/F3 is implemented and
+> typechecks. The only remaining gap is **content creation** — generating per-region clean
+> crops and creating a `partial` post (the out-of-band pipeline work, currently a PoC and
+> Replicate-credit blocked). See "Remaining" below.
+
 **Phase 0 — Foundations (shared)**
-- [ ] `/api/media/[postId]` redirect/stream route with per-request auth + presign (§7).
-- [ ] Blurred poster-frame extraction in the pipeline; optional `posts.posterKey`, `durationMs`.
+- [x] Schema carries `posts.posterKey` + `durationMs`; feed presigns the poster.
 - [ ] Raise/branch upload size limit + codec validation for video in `app/api/posts/route.ts`.
+- [ ] *(optional, see §7)* `/api/media/[postId]` redirect/stream route — robustness for if/when clips get longer; not required for ≤8s demo. (Direct presigned URLs in use for now.)
 
-**Phase 1 — F1 + F2: full-gate video**
-- [ ] `components/VideoStage.tsx` (base blurred `<video>` + reveal spring + minimal controls).
-- [ ] `PostCard` branches to `VideoStage` when `mediaType === "video"`; carry playback position across the unlock swap.
-- [ ] Point base + revealed `src` at the stream route. Verify range/seek on iOS Safari.
-- [ ] QA: autoplay-muted, reduced-motion crossfade, unlock → blur-fade, settlement proof chip.
+**Phase 1 — F1 + F2: full-gate video** ✅
+- [x] `components/VideoStage.tsx` (base blurred `<video>` + reveal spring + mute/pause controls + in-view autoplay).
+- [x] `PostCard` branches to `VideoStage` when `mediaType === "video"`; carries playback position across the unlock swap; pauses the teaser once revealed.
+- [x] Base teaser + revealed clip use presigned URLs (feed presign + `/api/unlock`).
+- [ ] Verify range/seek + autoplay-muted on a real iOS Safari (needs seeded video).
 
-**Phase 2 — F3 data + pipeline**
-- [ ] Schema: `accessMode`, `post_regions`, `region_unlocks` (+ migration).
-- [ ] Pipeline: cluster regions → union bbox → per-region clean crops → upload + persist `post_regions`.
-- [ ] `publishJob` partial branch; creator review UI to pick full/partial + per-region prices.
-- [ ] `lib/custodial.ts`: `unlockRegionWithCustodialBalance` / finalize / rollback.
-- [ ] `app/api/unlock/region/route.ts`.
+**Phase 2 — F3 data + payments** (data/payments ✅, pipeline ⏳)
+- [x] Schema: `accessMode`, `post_regions`, `region_unlocks` (migration `0003_melted_pretty_boy.sql`).
+- [x] `lib/custodial.ts`: `unlockRegionWithCustodialBalance` / rollback / finalize.
+- [x] `app/api/unlock/region/route.ts`.
+- [x] `getPostRegion` / `getPostRegionsWithUnlocks` queries; feed presigns owned crops.
+- [x] **Pipeline: `onTrackComplete` clusters regions → padded even-snapped crop → ffmpeg `cropVideoRegion` → upload → `blur_jobs.regionPatches` (migration `0004`).**
+- [x] **`publishJob` partial branch: writes `post_regions` + sets `accessMode = "partial"` when the creator picks partial and crops exist.**
+- [x] **Creator review UI toggle (`ReviewPanel`): "Lock whole clip" vs "Reveal per area"; approve route forwards `accessMode`.**
 
-**Phase 3 — F3 player**
-- [ ] `components/PartialVideoStage.tsx` + `useMediaSync` (base clock + rVFC drift correction).
-- [ ] Positioned region $ buttons (normalized rect → rendered px); per-region blur-fade on unlock.
-- [ ] **Device test the decoder ceiling on real iPhones**; if it fails, switch F3 to Option B.
+**Phase 3 — F3 player** ✅
+- [x] `components/PartialVideoStage.tsx` + `components/useMediaSync.ts` (base clock + rVFC drift correction).
+- [x] `components/useRegionUnlock.ts`; positioned region $ buttons via the object-cover transform; per-region blur-fade on reveal.
+- [ ] Quick smoke test on one real iPhone (1 base + 2 patches). Expected fine at this scale.
 
 **Phase 4 — Polish / future**
 - [ ] Per-frame region "follow" (use `track`), all-regions-owned → swap to full source, captions/scrubber via Vidstack, HLS for long-form.
 
+### Content creation — now wired into the real pipeline ✅
+
+The detect → track → composite pipeline now also produces partial posts end-to-end:
+
+- `lib/blur/state.ts` `onTrackComplete` → `buildRegionPatches()`: clusters the frame-0 detection boxes (`lib/blur/geometry.ts` `clusterBoxes`), pads + even-snaps each (`padClampEven`), ffmpeg-crops the clean source (`lib/blur/composite-video.ts` `cropVideoRegion`), uploads, and stores `{ label, rect, patchKey }[]` on `blur_jobs.regionPatches`. Non-fatal — a crop failure still lets the post publish as full.
+- The creator picks **Lock whole clip** vs **Reveal per area** in `ReviewPanel`; `publishJob` writes `post_regions` + flips `accessMode` accordingly.
+
+**Known limits (acceptable at ~2-region / 8s scope):**
+- Crop boxes are seeded from **frame-0 detections** + generous padding (`BLUR_REGION_PAD`, default 0.18). A region that drifts far over the clip could leave its crop window. v2: derive the union bbox from the SAM-2 mask track (`track` jsonb).
+- Crops are **rectangular**, so two regions whose padded boxes overlap could let one reveal expose the other. Fine for separated regions; otherwise re-blur the neighbour inside the crop.
+- The single-Cog path (`onCogComplete`) doesn't emit boxes, so partial isn't available there until the Cog returns per-region boxes.
+
+Tunables: `BLUR_MAX_REGIONS` (default 3), `BLUR_REGION_PAD` (default 0.18).
+
 ---
 
-## 10. Decisions to confirm before building
+## 10. Decisions
 
-1. **Clip length & scale** — short Reels-style clips (assumed) vs long-form? This decides MP4-progressive (now) vs HLS (later) and the decoder budget.
-2. **F3 priority** — is per-region reveal needed for the hackathon demo, or is full-gate video (Phase 1) the demo and F3 a follow-up? It's ~70% of the effort.
-3. **Decoder reality check** — we should prototype Option A on a real iPhone early; the go/no-go on Option A vs Option B gates Phase 3.
-4. **Region pricing UX** — auto-split the post price across regions, or creator sets each? (Plan assumes creator-set with a sensible default.)
+1. ~~Clip length & scale~~ — **Resolved: ≤7–8s short clips. Progressive MP4, no HLS.**
+2. ~~F3 priority~~ — **Resolved: F3 (partial, ~2 regions) is in demo scope alongside full-gate video.**
+3. ~~Decoder reality check~~ — **Resolved: at 3 decoders (1 base + 2 patches) this is not a concern; Option A confirmed, no Option B fallback.** Still worth a quick smoke test on one real iPhone during Phase 3, but it no longer gates the architecture.
+4. ~~Region pricing UX~~ — **Resolved: the creator sets ONE price on the post; every region costs that same amount.** No per-region price column; reuse `posts.unlockPrice`.
 
 ---
 

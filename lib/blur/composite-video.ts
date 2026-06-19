@@ -61,3 +61,37 @@ export function compositeVideoBlur(
       .on("error", reject);
   });
 }
+
+/**
+ * Crop the CLEAN source to a region rect → a small standalone clip used as a
+ * partial-reveal patch. Audio is dropped (the blurred base carries it). Output
+ * is web-safe H.264/yuv420p + faststart. `rect` must already be even-snapped
+ * (see padClampEven) — yuv420p rejects odd crop dimensions.
+ */
+export function cropVideoRegion(
+  srcPath: string,
+  outPath: string,
+  rect: { x: number; y: number; w: number; h: number },
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg()
+      .input(srcPath)
+      .videoFilters(`crop=${rect.w}:${rect.h}:${rect.x}:${rect.y}`)
+      .outputOptions([
+        "-an", // the base clip owns the audio
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+      ])
+      .save(outPath)
+      .on("end", () => resolve())
+      .on("error", reject);
+  });
+}

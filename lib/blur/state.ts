@@ -8,13 +8,29 @@ import {
 import { compositeImageBlur, maskCoverage, fetchBuffer } from "./composite";
 import { regionsToSam2Clicks } from "./geometry";
 import { getJob, updateJob, addPredictionId, type BlurJob } from "./jobs";
-import type { DetectedRegion } from "@/lib/db/schema";
+import type { DetectedRegion, RegionPatch } from "@/lib/db/schema";
 
 // ── Webhook URL ───────────────────────────────────────────────────────────────
-// Replicate calls back here when a stage finishes. Must be a public URL.
+// Replicate calls back here when a stage finishes. It MUST be an absolute,
+// publicly-reachable HTTPS URL — otherwise Replicate rejects the prediction at
+// create time ("422 webhook: Not a valid HTTPS URL"). Resolution order:
+//   1. NEXT_PUBLIC_APP_URL (explicit; scheme prepended if missing)
+//   2. Vercel's injected deployment host (covers prod + preview deploys)
+//   3. localhost (dev — webhook won't be delivered, but create won't 422)
+// NOTE: `?? ` must NOT be used for (1): an EMPTY-STRING env var (exactly how it
+// was misconfigured on prod) is not nullish, so `?? fallback` keeps the "" and
+// produces a relative URL. Trim-and-truthy-check instead.
+function webhookBase(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (explicit) return /^https?:\/\//i.test(explicit) ? explicit : `https://${explicit}`;
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() || process.env.VERCEL_URL?.trim();
+  if (host) return `https://${host}`;
+  return "http://localhost:3000";
+}
+
 function webhookUrl(jobId: string, stage: "detect" | "track" | "cog"): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base}/api/blur/webhook?job=${jobId}&stage=${stage}`;
+  return `${webhookBase()}/api/blur/webhook?job=${jobId}&stage=${stage}`;
 }
 
 const TTL = 60 * 30; // signed-URL lifetime — must outlive the whole pipeline
@@ -27,14 +43,27 @@ export function usingCog(): boolean {
   return Boolean(process.env.REPLICATE_VEIL_AUTOBLUR_VERSION);
 }
 
-export async function startPipeline(
-  jobId: string,
-  rawUrl: string,
-  mediaType: "image" | "video",
+/**
+ * Single source of truth for (re)starting a job's pipeline from a persisted
+ * `blur_jobs` row: presign the raw upload, then fire the first stage — the
+ * single Cog when configured (P5), else the multi-stage chain (P2). Used by
+ * upload (`/api/posts`, `/api/blur/ingest`), the reconcile cron (to recover a
+ * job whose kickoff was lost), reject (re-run stronger), and manual retry.
+ * `opts` escalates detection strength on a re-run; ignored on the Cog path.
+ *
+ * IMPORTANT: detectStage/cogStage flip the job to `detecting` and record the
+ * prediction id ONLY after Replicate accepts the `create`. So if this throws
+ * (a transient 402/429/5xx at create), the job stays `uploaded` with no
+ * prediction id — the contract the reconcile cron relies on to re-kick it.
+ */
+export async function kickOff(
+  job: Pick<BlurJob, "id" | "rawBlobKey" | "mediaType">,
+  opts: DetectOpts = {},
 ) {
+  const rawUrl = await presignPrivateGet(job.rawBlobKey, TTL);
   return usingCog()
-    ? cogStage(jobId, rawUrl, mediaType)
-    : detectStage(jobId, rawUrl, mediaType);
+    ? cogStage(job.id, rawUrl, job.mediaType)
+    : detectStage(job.id, rawUrl, job.mediaType, opts);
 }
 
 // P5 — one prediction does detect+track+composite on the GPU box.
@@ -264,14 +293,74 @@ async function onTrackComplete(job: BlurJob, output: unknown) {
       contentType: "video/mp4",
       upsert: true,
     });
+
+    // Per-region clean crops for optional partial-reveal publishing. The clean
+    // source is already on disk here. Non-fatal: if it fails, the post can still
+    // be published as a normal full-gate post.
+    let regionPatches: RegionPatch[] = [];
+    try {
+      regionPatches = await buildRegionPatches(job, srcPath, work);
+    } catch (e) {
+      console.error("[blur] region crop failed (publishing full is still possible):", e);
+    }
+
     await updateJob(job.id, {
       status: "ready_for_review",
       blurredBlobUrl: blob.pathname,
       originalBlobKey: job.rawBlobKey,
+      regionPatches,
     });
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+}
+
+/**
+ * Crop each detected region out of the clean source into its own clip. Detection
+ * seeds boxes at frame 0; we pad generously so a region that drifts over a short
+ * clip stays inside its crop. Crops are rectangular, so this assumes regions
+ * don't overlap (true for the ~2-region clips we target) — otherwise one crop
+ * could expose a neighbour. Returns [] when there's nothing to crop.
+ */
+async function buildRegionPatches(
+  job: BlurJob,
+  srcPath: string,
+  work: string,
+): Promise<RegionPatch[]> {
+  const regions = job.regions ?? [];
+  if (!regions.length) return [];
+
+  const { probeVideo } = await import("./frames");
+  const { cropVideoRegion } = await import("./composite-video");
+  const { clusterBoxes, padClampEven, toNormalizedRect } = await import("./geometry");
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+
+  const meta = await probeVideo(srcPath);
+  if (!meta.width || !meta.height) return [];
+
+  const maxN = Number(process.env.BLUR_MAX_REGIONS ?? 3);
+  const pad = Number(process.env.BLUR_REGION_PAD ?? 0.18);
+  const clusters = clusterBoxes(regions, maxN);
+
+  const patches: RegionPatch[] = [];
+  for (let i = 0; i < clusters.length; i++) {
+    const px = padClampEven(clusters[i].box, pad, meta.width, meta.height);
+    if (px.w < 16 || px.h < 16) continue; // too small to bother
+    const out = join(work, `region-${i}.mp4`);
+    await cropVideoRegion(srcPath, out, px);
+    const blob = await uploadPrivate(
+      `blur-jobs/${job.id}/region-${i}.mp4`,
+      readFileSync(out),
+      { contentType: "video/mp4", upsert: true },
+    );
+    patches.push({
+      label: clusters[i].label,
+      rect: toNormalizedRect(px, meta.width, meta.height),
+      patchKey: blob.pathname,
+    });
+  }
+  return patches;
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────

@@ -43,7 +43,7 @@ type Payment = {
   creditedAt: string | null;
 };
 
-type Tab = "cards" | "payments" | "alternative";
+type Tab = "cards" | "payments";
 
 const AMOUNTS = ["10", "25", "50"] as const;
 
@@ -271,14 +271,6 @@ export default function PaymentCardsPage() {
             <TabButton active={tab === "payments"} onClick={() => setTab("payments")}>
               PAYMENTS
             </TabButton>
-            <TabButton
-              active={tab === "alternative"}
-              onClick={() => setTab("alternative")}
-              wide
-              alignStart
-            >
-              ALTERNATIVE METHODS
-            </TabButton>
           </div>
         </div>
       </header>
@@ -383,16 +375,6 @@ export default function PaymentCardsPage() {
         )}
 
         {tab === "payments" && <PaymentList payments={payments} centered />}
-
-        {tab === "alternative" && (
-          <div className="flex min-h-[520px] items-center justify-center px-4 text-center">
-            <AppEmptyState
-              icon={CreditCard}
-              title="No alternative methods yet"
-              body="More ways to add funds will appear here."
-            />
-          </div>
-        )}
       </section>
 
       {notice && (
@@ -516,23 +498,17 @@ export default function PaymentCardsPage() {
 function TabButton({
   active,
   onClick,
-  wide,
-  alignStart,
   children,
 }: {
   active: boolean;
   onClick: () => void;
-  wide?: boolean;
-  alignStart?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex h-full items-center overflow-hidden whitespace-nowrap text-[13px] font-bold tracking-[0.02em] ${
-        wide ? "min-w-[190px]" : "min-w-[126px]"
-      } ${alignStart ? "justify-start pl-5" : "justify-center"}`}
+      className="relative flex h-full min-w-[126px] items-center justify-center overflow-hidden whitespace-nowrap text-[13px] font-bold tracking-[0.02em]"
       style={{ color: active ? "var(--text)" : "var(--faint)" }}
     >
       {children}

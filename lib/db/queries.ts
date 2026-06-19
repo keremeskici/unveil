@@ -1,7 +1,18 @@
 import { randomBytes } from "node:crypto";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, inArray, ne, sql } from "drizzle-orm";
 import { getDb } from "./index";
-import { users, posts, unlocks, loyaltyLedger, userBalances } from "./schema";
+import {
+  users,
+  posts,
+  unlocks,
+  loyaltyLedger,
+  userBalances,
+  postRegions,
+  regionUnlocks,
+  tips,
+  comments,
+  follows,
+} from "./schema";
 
 export type ClerkUserInput = {
   clerkId: string;
@@ -58,6 +69,15 @@ export async function getUserById(userId: string) {
   const db = getDb();
   return db.query.users.findFirst({
     where: eq(users.id, userId),
+  });
+}
+
+export async function getUserByUsername(username: string) {
+  const handle = username.replace(/^@/, "").trim();
+  if (!handle) return null;
+  const db = getDb();
+  return db.query.users.findFirst({
+    where: eq(users.username, handle),
   });
 }
 
@@ -172,6 +192,56 @@ export async function getPost(postId: string) {
   return db.query.posts.findFirst({
     where: eq(posts.id, postId),
     with: { creator: true },
+  });
+}
+
+/** A single region plus its parent post (for price + ownership checks). */
+export async function getPostRegion(regionId: string) {
+  const db = getDb();
+  return db.query.postRegions.findFirst({
+    where: eq(postRegions.id, regionId),
+    with: { post: true },
+  });
+}
+
+/**
+ * Regions for a partial post, each annotated with whether `fanId` has unlocked
+ * it. Drives the partial player: locked regions show a $ button, unlocked ones
+ * overlay the clean crop. `patchMediaKey` is returned ONLY for regions this fan
+ * already owns (so the caller can presign them); locked crops never leave here.
+ */
+export async function getPostRegionsWithUnlocks(postId: string, fanId?: string) {
+  const db = getDb();
+  const regions = await db.query.postRegions.findMany({
+    where: eq(postRegions.postId, postId),
+    orderBy: [asc(postRegions.position)],
+  });
+  if (regions.length === 0) return [];
+
+  const unlockedIds = new Set<string>();
+  if (fanId) {
+    const rows = await db.query.regionUnlocks.findMany({
+      where: and(
+        eq(regionUnlocks.fanId, fanId),
+        inArray(
+          regionUnlocks.postRegionId,
+          regions.map((r) => r.id),
+        ),
+      ),
+    });
+    rows.forEach((r) => unlockedIds.add(r.postRegionId));
+  }
+
+  return regions.map((r) => {
+    const unlocked = unlockedIds.has(r.id);
+    return {
+      id: r.id,
+      rect: r.rect,
+      position: r.position,
+      unlocked,
+      // Only owned crops expose their key for presigning.
+      patchMediaKey: unlocked ? r.patchMediaKey : null,
+    };
   });
 }
 
@@ -322,23 +392,123 @@ export async function getUnlockedPosts(fanId: string, limit = 24) {
  * actor, the post, the gross amount paid, and when. The creator-cut split is
  * applied by the caller (see /api/notifications).
  */
-export async function getNotifications(userId: string, limit = 30) {
+export type NotifType = "unlock" | "tip" | "comment" | "follow";
+
+export type RawNotification = {
+  type: NotifType;
+  id: string;
+  amount: string | null;
+  at: Date;
+  postTitle: string | null;
+  actorUsername: string | null;
+  actorWallet: string;
+  actorAvatar: string | null;
+};
+
+/**
+ * Activity on *this user's* content, derived (no dedicated table) by unioning
+ * four sources, newest first:
+ *  - unlocks  → "unveiled your post"  (Unveils)
+ *  - tips     → "tipped you"          (Tips)
+ *  - comments → "commented on your post" (Mentions)
+ *  - follows  → "started following you"
+ * Amounts are gross; the caller applies the creator cut where relevant.
+ */
+export async function getNotifications(
+  userId: string,
+  limit = 30,
+): Promise<RawNotification[]> {
   const db = getDb();
-  return db
-    .select({
-      id: unlocks.id,
-      amountPaid: unlocks.amountPaid,
-      unlockedAt: unlocks.unlockedAt,
-      postId: posts.id,
-      postTitle: posts.title,
-      actorUsername: users.username,
-      actorWallet: users.walletAddress,
-      actorAvatar: users.avatar,
-    })
-    .from(unlocks)
-    .innerJoin(posts, eq(unlocks.postId, posts.id))
-    .innerJoin(users, eq(unlocks.fanId, users.id))
-    .where(eq(posts.creatorId, userId))
-    .orderBy(desc(unlocks.unlockedAt))
-    .limit(limit);
+
+  const [unlockRows, tipRows, commentRows, followRows] = await Promise.all([
+    db
+      .select({
+        id: unlocks.id,
+        amount: unlocks.amountPaid,
+        at: unlocks.unlockedAt,
+        postTitle: posts.title,
+        actorUsername: users.username,
+        actorWallet: users.walletAddress,
+        actorAvatar: users.avatar,
+      })
+      .from(unlocks)
+      .innerJoin(posts, eq(unlocks.postId, posts.id))
+      .innerJoin(users, eq(unlocks.fanId, users.id))
+      .where(eq(posts.creatorId, userId))
+      .orderBy(desc(unlocks.unlockedAt))
+      .limit(limit),
+    db
+      .select({
+        id: tips.id,
+        amount: tips.amount,
+        at: tips.createdAt,
+        postTitle: posts.title,
+        actorUsername: users.username,
+        actorWallet: users.walletAddress,
+        actorAvatar: users.avatar,
+      })
+      .from(tips)
+      .leftJoin(posts, eq(tips.postId, posts.id))
+      .innerJoin(users, eq(tips.fanId, users.id))
+      .where(eq(tips.creatorId, userId))
+      .orderBy(desc(tips.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: comments.id,
+        at: comments.createdAt,
+        postTitle: posts.title,
+        actorUsername: users.username,
+        actorWallet: users.walletAddress,
+        actorAvatar: users.avatar,
+      })
+      .from(comments)
+      .innerJoin(posts, eq(comments.postId, posts.id))
+      .innerJoin(users, eq(comments.userId, users.id))
+      .where(and(eq(posts.creatorId, userId), ne(comments.userId, userId)))
+      .orderBy(desc(comments.createdAt))
+      .limit(limit),
+    db
+      .select({
+        id: follows.id,
+        at: follows.createdAt,
+        actorUsername: users.username,
+        actorWallet: users.walletAddress,
+        actorAvatar: users.avatar,
+      })
+      .from(follows)
+      .innerJoin(users, eq(follows.followerId, users.id))
+      .where(eq(follows.followingId, userId))
+      .orderBy(desc(follows.createdAt))
+      .limit(limit),
+  ]);
+
+  const merged: RawNotification[] = [
+    ...unlockRows.map((r) => ({ type: "unlock" as const, ...r })),
+    ...tipRows.map((r) => ({ type: "tip" as const, ...r })),
+    ...commentRows.map((r) => ({
+      type: "comment" as const,
+      amount: null,
+      postTitle: r.postTitle,
+      id: r.id,
+      at: r.at,
+      actorUsername: r.actorUsername,
+      actorWallet: r.actorWallet,
+      actorAvatar: r.actorAvatar,
+    })),
+    ...followRows.map((r) => ({
+      type: "follow" as const,
+      amount: null,
+      postTitle: null,
+      id: r.id,
+      at: r.at,
+      actorUsername: r.actorUsername,
+      actorWallet: r.actorWallet,
+      actorAvatar: r.actorAvatar,
+    })),
+  ];
+
+  return merged
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .slice(0, limit);
 }

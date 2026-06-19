@@ -13,6 +13,7 @@ export async function POST(
   const body = (await req.json().catch(() => ({}))) as {
     title?: string;
     unlockPrice?: string;
+    accessMode?: "full" | "partial";
   };
 
   try {
@@ -20,6 +21,7 @@ export async function POST(
     const { post } = await publishJob(id, {
       title: body.title,
       unlockPrice: body.unlockPrice,
+      accessMode: body.accessMode,
     });
     return Response.json({ status: "published", postId: post.id });
   } catch (e) {

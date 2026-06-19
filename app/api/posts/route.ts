@@ -134,8 +134,8 @@ export async function POST(req: NextRequest) {
   });
 
   // 4. Optional handoff trigger via the blur pipeline's canonical entry point
-  //    (`startPipeline` routes to the single Cog or the multi-stage chain). Only
-  //    if Replicate is configured; never let a failure fail the upload.
+  //    (`kickOff` routes to the single Cog or the multi-stage chain). Only if
+  //    Replicate is configured; never let a failure fail the upload.
   const blurConfigured =
     !!process.env.REPLICATE_API_TOKEN &&
     (!!process.env.REPLICATE_VEIL_AUTOBLUR_VERSION ||
@@ -145,15 +145,13 @@ export async function POST(req: NextRequest) {
 
   if (blurConfigured) {
     try {
-      const [{ startPipeline }, { presignPrivateGet }] = await Promise.all([
-        import("@/lib/blur/state"),
-        import("@/lib/blob"),
-      ]);
-      const rawUrl = await presignPrivateGet(rawBlobKey, 60 * 30);
-      await startPipeline(job.id, rawUrl, mediaType);
+      const { kickOff } = await import("@/lib/blur/state");
+      await kickOff({ id: job.id, rawBlobKey, mediaType });
     } catch (err) {
-      // Leave the job in "uploaded" for the pipeline to pick up later.
-      console.error("blur pipeline trigger failed (non-fatal):", err);
+      // Non-fatal: the Replicate `create` can fail transiently (402/429/5xx).
+      // The job stays "uploaded" with no prediction id; the reconcile cron
+      // (/api/blur/reconcile) re-kicks orphaned uploads, so it self-heals.
+      console.error("blur pipeline trigger failed (will be reconciled):", err);
     }
   }
 

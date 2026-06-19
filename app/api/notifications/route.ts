@@ -1,4 +1,4 @@
-import { getNotifications } from "@/lib/db/queries";
+import { getNotifications, type NotifType } from "@/lib/db/queries";
 import { CREATOR_CUT } from "@/lib/constants";
 import {
   requireCurrentAppUser,
@@ -8,11 +8,18 @@ import {
 
 export const runtime = "nodejs";
 
+const ACTION: Record<NotifType, string> = {
+  unlock: "unveiled",
+  tip: "tipped you",
+  comment: "commented on",
+  follow: "started following you",
+};
+
 /**
- * GET /api/notifications — derived activity feed: the unlock events
- * on this user's posts ("someone unveiled your post"). No dedicated table; the
- * `unlocks` ledger is the source of truth. The displayed amount is the creator's
- * net cut, matching what actually lands with them.
+ * GET /api/notifications — derived activity feed unioning the events on this
+ * user's content: unlocks ("unveiled"), tips ("tipped you"), comments
+ * ("commented on"), and follows ("started following you"). No dedicated table.
+ * Unlock/tip amounts are shown as the creator's net cut — what actually lands.
  */
 export async function GET() {
   let user;
@@ -25,17 +32,21 @@ export async function GET() {
 
   const rows = await getNotifications(user.id);
   const items = rows.map((r) => {
-    const net = (parseFloat(r.amountPaid) * CREATOR_CUT).toFixed(2);
     const actor =
       r.actorUsername ?? `@${r.actorWallet.slice(2, 8).toLowerCase()}`;
+    const net =
+      r.amount != null
+        ? `+$${(parseFloat(r.amount) * CREATOR_CUT).toFixed(2)}`
+        : "";
     return {
-      id: r.id,
+      id: `${r.type}:${r.id}`,
+      type: r.type,
       actor,
       avatar: r.actorAvatar,
-      action: "unveiled",
-      postTitle: r.postTitle,
-      amount: `+$${net}`,
-      at: r.unlockedAt,
+      action: ACTION[r.type],
+      postTitle: r.postTitle ?? "",
+      amount: net,
+      at: r.at,
     };
   });
 

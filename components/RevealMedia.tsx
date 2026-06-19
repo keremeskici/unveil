@@ -18,6 +18,7 @@ export function RevealMedia({
   alt,
   overlay,
   priority = false,
+  animateReveal = true,
 }: {
   previewUrl: string;
   revealedUrl: string | null;
@@ -25,6 +26,7 @@ export function RevealMedia({
   alt: string;
   overlay?: ReactNode;
   priority?: boolean;
+  animateReveal?: boolean;
 }) {
   return (
     <div
@@ -53,7 +55,7 @@ export function RevealMedia({
       {/* Revealed full media springs in over the preview (CSS, see globals.css). */}
       {revealed && revealedUrl && (
         <>
-          <div className="motion-reveal absolute inset-0">
+          <div className={animateReveal ? "motion-reveal absolute inset-0" : "absolute inset-0"}>
             <Image
               src={revealedUrl}
               alt={alt}
@@ -63,18 +65,20 @@ export function RevealMedia({
               unoptimized
             />
           </div>
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div
-              className="motion-shimmer absolute top-0 bottom-0"
-              style={{
-                width: "55%",
-                background:
-                  "linear-gradient(105deg,transparent,rgba(216,27,71,.5) 45%,rgba(255,210,224,.85) 50%,rgba(216,27,71,.5) 55%,transparent)",
-                mixBlendMode: "screen",
-                animation: "vshimmer .85s cubic-bezier(.22,1,.36,1) .08s 1 both",
-              }}
-            />
-          </div>
+          {animateReveal && (
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div
+                className="motion-shimmer absolute top-0 bottom-0"
+                style={{
+                  width: "55%",
+                  background:
+                    "linear-gradient(105deg,transparent,rgba(216,27,71,.5) 45%,rgba(255,210,224,.85) 50%,rgba(216,27,71,.5) 55%,transparent)",
+                  mixBlendMode: "screen",
+                  animation: "vshimmer .85s cubic-bezier(.22,1,.36,1) .08s 1 both",
+                }}
+              />
+            </div>
+          )}
         </>
       )}
 

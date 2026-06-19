@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { Eye, EyeOff, Lock } from "lucide-react";
 import { isDevAuthEnabled } from "@/lib/dev-session";
 import { notifyDevAuthChanged, useAppAuth } from "./useAppAuth";
-import { CurtainMark } from "./Wordmark";
 
 type AuthMode = "sign-in" | "sign-up";
 type OAuthStrategy = "oauth_google" | "oauth_x";
@@ -408,26 +408,38 @@ export function Onboarding() {
           paddingBottom: "max(18px, env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <div className="mb-5 flex items-center justify-center gap-[11px]">
-          <CurtainMark
-            width={48}
-            height={48}
-            radius={12}
-            glow="0 0 24px rgba(255,20,40,.44)"
+        <div className="mb-6 flex items-center justify-center gap-4">
+          <Image
+            src="/unveil-eye-logo-v2.png"
+            alt=""
+            width={92}
+            height={92}
+            priority
+            className="h-[92px] w-[92px] object-contain"
+            style={{ mixBlendMode: "screen" }}
           />
           <span
             className="font-bold"
-            style={{ fontSize: 25, letterSpacing: 0 }}
+            style={{
+              fontFamily: "var(--font-brand-manrope), sans-serif",
+              fontSize: 27,
+              letterSpacing: 0,
+            }}
           >
             UNVEIL
           </span>
         </div>
 
-        <h1 className="m-0 mb-[30px] max-w-[330px] text-[29px] font-bold leading-[1.14]">
-          Log in to support your favorite creators
-        </h1>
-
-        <div className="text-text mb-[13px] text-sm font-semibold">
+        <div
+          className={`text-text mb-[13px] font-semibold ${
+            mode === "sign-in" &&
+            !isResetRequest &&
+            !isResetVerify &&
+            !isVerifyingClientTrust
+              ? "text-[17px]"
+              : "text-sm"
+          }`}
+        >
           {isResetRequest
             ? "Reset password"
             : isResetVerify

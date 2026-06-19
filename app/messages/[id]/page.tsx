@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { getCurrentAppUser } from "@/lib/app-user";
 import { buildConversationView } from "@/lib/messages-view";
@@ -41,7 +42,7 @@ export default async function DmPage({
   );
 }
 
-function DmNotice({ children }: { children: React.ReactNode }) {
+function DmNotice({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-dvh flex-1 flex-col">
       <header className="bg-surface/80 border-hairline pt-safe sticky top-0 z-40 border-b backdrop-blur-xl">

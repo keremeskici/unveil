@@ -200,7 +200,7 @@ export default function NewPostPage() {
               type="button"
               onClick={next}
               disabled={!canGoNext}
-              className="h-10 px-5 text-sm"
+              className="!h-10 px-5 text-sm"
             >
               Next
             </Button>
@@ -210,7 +210,7 @@ export default function NewPostPage() {
               onClick={publish}
               loading={stage === "uploading"}
               disabled={!canPublish}
-              className="h-10 px-5 text-sm"
+              className="!h-10 px-5 text-sm"
             >
               Publish
             </Button>
@@ -309,7 +309,7 @@ function ComposeScreen({
       <button
         type="button"
         onClick={onPick}
-        className="border-hairline-strong text-muted relative flex aspect-[4/5] w-full flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed bg-bg transition-transform active:scale-[0.99]"
+        className="border-hairline-strong text-muted relative flex aspect-square w-full flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed bg-bg transition-transform active:scale-[0.99]"
         aria-label="Add media"
       >
         {previewUrl ? (
@@ -361,7 +361,7 @@ function ComposeScreen({
             value={price}
             onChange={(event) => onPrice(event.target.value)}
             placeholder="0"
-            className="tabular placeholder:text-muted w-16 bg-transparent text-right text-[14px] font-semibold outline-none"
+            className="tabular placeholder:text-muted w-16 bg-transparent text-right text-[14px] font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </label>
       </section>
@@ -424,7 +424,7 @@ function ReviewScreen({
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-[18px] pt-[18px] pb-8">
-      <section className="border-hairline-strong relative aspect-[4/5] w-full overflow-hidden rounded-[24px] border bg-surface-2">
+      <section className="border-hairline-strong relative aspect-square w-full overflow-hidden rounded-[22px] border bg-surface-2">
         {previewUrl ? (
           <MediaPreview isVideo={isVideo} src={previewUrl} />
         ) : (

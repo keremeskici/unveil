@@ -187,7 +187,7 @@ export function CommentsSheet({
         </div>
 
         {/* Scroll area */}
-          <div className="flex-1 overflow-y-auto px-3 py-2">
+        <div className="flex-1 overflow-y-auto px-3 py-2">
           {/* Caption row */}
           <div className="border-hairline bg-surface-2 mb-2 flex gap-2.5 rounded-md border px-3 py-3">
             <Avatar name={authorHandle} src={authorAvatar} size="sm" />
@@ -287,7 +287,7 @@ export function CommentsSheet({
 
         {/* Footer — emoji bar + composer move together when the input is focused */}
         <div
-          className="bg-surface transition-transform duration-[220ms] ease-veil focus-within:-translate-y-5 motion-reduce:transform-none motion-reduce:transition-none"
+          className="border-hairline bg-surface border-t transition-transform duration-[220ms] ease-veil focus-within:-translate-y-5 motion-reduce:transform-none motion-reduce:transition-none"
           style={{
             paddingBottom: "max(20px, env(safe-area-inset-bottom, 0px))",
           }}
@@ -324,7 +324,13 @@ export function CommentsSheet({
                 </button>
               </div>
             )}
-            <div className="bg-surface-2 border-hairline flex items-center gap-2 rounded-pill border py-[7px] pr-[7px] pl-4 focus-within:border-[color:var(--primary)]">
+            <div
+              className="bg-surface-2 border-hairline flex items-center gap-2 rounded-pill border py-[7px] pr-[7px] pl-4 focus-within:border-[color:var(--primary)]"
+              onPointerDown={(event) => {
+                if (event.target instanceof HTMLButtonElement) return;
+                inputRef.current?.focus({ preventScroll: true });
+              }}
+            >
               <input
                 ref={inputRef}
                 value={text}
@@ -333,6 +339,8 @@ export function CommentsSheet({
                   if (e.key === "Enter") submit();
                 }}
                 placeholder={replyTo ? `Reply to ${replyTo.who}…` : "Add a comment…"}
+                inputMode="text"
+                enterKeyHint="send"
                 className="text-text min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
               <button

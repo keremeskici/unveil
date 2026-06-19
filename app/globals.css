@@ -342,6 +342,53 @@
     opacity: 0;
   }
 }
+@keyframes vtipsuccess {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes vtiparrow {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.86);
+  }
+  48% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1);
+  }
+}
+@keyframes vtiptrail {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scaleY(0.35);
+  }
+  35% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-42px) scaleY(1);
+  }
+}
+@keyframes vtipcopy {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @keyframes vsheet {
   from {
     transform: translateY(100%);
@@ -524,6 +571,22 @@ body {
   animation-delay: 0.32s;
 }
 
+.tip-success-screen {
+  animation: vtipsuccess 280ms var(--ease-out) both;
+}
+
+.tip-success-arrow {
+  animation: vtiparrow 760ms var(--ease-out) 90ms both;
+}
+
+.tip-success-trail {
+  animation: vtiptrail 820ms var(--ease-out) 90ms both;
+}
+
+.tip-success-copy {
+  animation: vtipcopy 340ms var(--ease-out) 420ms both;
+}
+
 .animate-accordion-down {
   animation: accordion-down 220ms var(--ease-out) both;
 }
@@ -608,7 +671,14 @@ textarea:focus-visible,
   /* Reveal/patch collapse to instant via the 1ms duration above (the `both`
      fill still lands on the revealed end state). The shimmer is pure flourish —
      hide it outright rather than freeze a bright stripe mid-sweep. */
-  .motion-shimmer {
+  .motion-shimmer,
+  .tip-success-trail {
     display: none !important;
+  }
+
+  .tip-success-screen,
+  .tip-success-arrow,
+  .tip-success-copy {
+    animation: none !important;
   }
 }

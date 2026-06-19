@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, CreditCard, Send } from "lucide-react";
+import { ArrowLeft, ArrowUp, Check, CreditCard, Send } from "lucide-react";
 import { Avatar } from "./ui/Avatar";
 import { useAppAuth } from "./useAppAuth";
 
-const PRESETS = [1, 10, 20, 50, 100];
+const AMOUNT_OPTIONS = [1, "custom", 10, 20, 50, 100] as const;
 const DEFAULT_CUSTOM_AMOUNT = "5";
 
 type TipStage = "idle" | "sending" | "sent" | "error";
@@ -143,7 +143,7 @@ export function TipSheet({
       setStage("sent");
       haptic([6, 40, 12]);
       window.dispatchEvent(new Event("veil:balance-changed"));
-      setTimeout(() => onClose(), 1400);
+      setTimeout(() => onClose(), 1700);
     } catch (err) {
       setStage("idle");
       setError(err instanceof Error ? err.message : "Tip failed");
@@ -155,7 +155,7 @@ export function TipSheet({
       role="dialog"
       aria-modal="true"
       aria-label="Send a tip"
-      className="fixed inset-0 z-50 flex flex-col"
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
       style={{
         background:
           "radial-gradient(120% 55% at 50% -6%, var(--tint), transparent 58%), var(--bg)",
@@ -187,16 +187,8 @@ export function TipSheet({
           <div className="mt-3 text-lg font-bold">{creatorName}</div>
           <div className="text-faint mt-0.5 text-[13px]">{creatorHandle}</div>
 
-          {/* Big amount + coin */}
+          {/* Big amount */}
           <div className="relative my-6 flex items-baseline gap-0.5">
-            {stage === "sent" && (
-              <div
-                className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 text-2xl"
-                style={{ animation: "vcoin 1s cubic-bezier(.22,1,.36,1) both" }}
-              >
-                🪙
-              </div>
-            )}
             <span
               className="text-primary tabular mt-1.5 self-start text-3xl font-bold"
               style={{ fontFamily: "var(--font-mono, 'Geist Mono'), monospace" }}
@@ -213,62 +205,70 @@ export function TipSheet({
 
           {/* Preset chips */}
           <div className="grid w-full max-w-[320px] grid-cols-3 gap-2.5">
-            <label
-              className="tabular flex h-[50px] items-center justify-center gap-1 rounded-[14px] px-3 text-[17px] transition-colors"
-              style={
-                amountMode === "custom"
-                  ? {
-                      background: "var(--tint)",
-                      border: "1px solid rgba(194,20,59,.4)",
-                      color: "var(--text)",
-                      fontWeight: 700,
-                      fontFamily: "var(--font-mono, 'Geist Mono'), monospace",
+            {AMOUNT_OPTIONS.map((option) => {
+              if (option === "custom") {
+                return (
+                  <label
+                    key={option}
+                    className="tabular flex h-[50px] items-center justify-center gap-1 rounded-[14px] px-3 text-[17px] transition-colors"
+                    style={
+                      amountMode === "custom"
+                        ? {
+                            background: "var(--tint)",
+                            border: "1px solid rgba(194,20,59,.4)",
+                            color: "var(--text)",
+                            fontWeight: 700,
+                            fontFamily:
+                              "var(--font-mono, 'Geist Mono'), monospace",
+                          }
+                        : {
+                            background: "var(--surface-2)",
+                            border: "1px solid var(--hairline)",
+                            color: "var(--muted)",
+                            fontWeight: 600,
+                            fontFamily:
+                              "var(--font-mono, 'Geist Mono'), monospace",
+                          }
                     }
-                  : {
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--hairline)",
-                      color: "var(--muted)",
-                      fontWeight: 600,
-                      fontFamily: "var(--font-mono, 'Geist Mono'), monospace",
-                    }
+                  >
+                    <span className="text-primary">$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.]?[0-9]*"
+                      aria-label="Custom tip amount"
+                      value={customAmount}
+                      onFocus={() => {
+                        if (stage !== "idle") return;
+                        setAmountMode("custom");
+                      }}
+                      onChange={(e) => {
+                        if (stage !== "idle") return;
+                        setAmountMode("custom");
+                        setCustomAmount(sanitizeTipAmountInput(e.target.value));
+                        setError(null);
+                      }}
+                      onBlur={() => {
+                        if (customTipAmount != null) {
+                          setCustomAmount(formatTipAmount(customTipAmount));
+                        }
+                      }}
+                      disabled={stage !== "idle"}
+                      placeholder="Custom"
+                      className="min-w-0 flex-1 bg-transparent text-center text-[17px] font-[inherit] text-inherit outline-none placeholder:text-[color:var(--faint)] disabled:opacity-70"
+                    />
+                  </label>
+                );
               }
-            >
-              <span className="text-primary">$</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]*[.]?[0-9]*"
-                aria-label="Custom tip amount"
-                value={customAmount}
-                onFocus={() => {
-                  if (stage !== "idle") return;
-                  setAmountMode("custom");
-                }}
-                onChange={(e) => {
-                  if (stage !== "idle") return;
-                  setAmountMode("custom");
-                  setCustomAmount(sanitizeTipAmountInput(e.target.value));
-                  setError(null);
-                }}
-                onBlur={() => {
-                  if (customTipAmount != null) {
-                    setCustomAmount(formatTipAmount(customTipAmount));
-                  }
-                }}
-                disabled={stage !== "idle"}
-                placeholder="Custom"
-                className="min-w-0 flex-1 bg-transparent text-center text-[17px] font-inherit text-inherit outline-none placeholder:text-[color:var(--faint)] disabled:opacity-70"
-              />
-            </label>
-            {PRESETS.map((a) => {
-              const on = amountMode === "preset" && a === amount;
+
+              const on = amountMode === "preset" && option === amount;
               return (
                 <button
-                  key={a}
+                  key={option}
                   type="button"
                   onClick={() => {
                     if (stage !== "idle") return;
-                    setPresetAmount(a);
+                    setPresetAmount(option);
                     setAmountMode("preset");
                     setError(null);
                     haptic(4);
@@ -294,7 +294,7 @@ export function TipSheet({
                         }
                   }
                 >
-                  ${a}
+                  ${option}
                 </button>
               );
             })}
@@ -372,12 +372,42 @@ export function TipSheet({
             ) : (
               <>
                 <Send size={19} strokeWidth={2.2} />
-                <span>{invalidAmount ? "Send tip" : `Send $${amountLabel} tip`}</span>
+                <span>
+                  {invalidAmount ? "Send tip" : `Send $${amountLabel} tip`}
+                </span>
               </>
             )}
           </button>
         </div>
       </div>
+
+      {stage === "sent" && (
+        <div
+          className="tip-success-screen absolute inset-0 z-20 flex flex-col items-center justify-center px-8 text-center text-white"
+          aria-live="polite"
+          style={{
+            background:
+              "radial-gradient(95% 55% at 50% 8%, rgba(255,255,255,.18), transparent 58%), linear-gradient(180deg, var(--primary-hover), var(--primary-press))",
+          }}
+        >
+          <div className="tip-success-mark relative flex size-28 items-center justify-center rounded-full border border-white/30 bg-white/10 shadow-[0_18px_50px_rgba(0,0,0,.28)]">
+            <span className="tip-success-trail absolute h-16 w-1 rounded-full bg-white/40" />
+            <ArrowUp
+              size={76}
+              strokeWidth={2.5}
+              className="tip-success-arrow relative z-10"
+            />
+          </div>
+          <div className="tip-success-copy mt-8">
+            <div className="text-3xl font-bold tracking-tight">
+              Sent ${amountLabel}
+            </div>
+            <div className="mt-2 text-sm font-medium text-white/78">
+              to {creatorHandle}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

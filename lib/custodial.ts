@@ -1038,25 +1038,133 @@ export async function tipWithCustodialBalance({
   });
 }
 
-export type MppCallTickResult =
+export type MppCallReserveResult =
   | {
-      status: "charged";
+      status: "reserved";
       txHash: string;
       balance: string;
+      escrowedBalance: string;
       amount: string;
       chargedSeconds: number;
     }
   | {
-      status: "already_charged";
+      status: "already_reserved";
       txHash: string;
       balance: string;
+      escrowedBalance: string;
       amount: string;
       chargedSeconds: number;
     }
   | { status: "insufficient_funds"; balance: string; required: string }
   | { status: "self_call" };
 
-export async function chargeMppCallTick({
+export type MppCallSettleResult =
+  | {
+      status: "settled" | "already_settled";
+      txHash: string;
+      balance: string;
+      escrowedBalance: string;
+      amount: string;
+    }
+  | { status: "nothing_to_settle"; balance: string; escrowedBalance: string }
+  | { status: "self_call" };
+
+function mppCallReserveReference(threadId: string, callId: string, tick: number) {
+  return `mpp-call:${threadId}:${callId}:reserve:${tick}`;
+}
+
+function mppCallSettleReference(threadId: string, callId: string) {
+  return `mpp-call:${threadId}:${callId}:settle`;
+}
+
+function mppCallReserveReferenceLike(threadId: string, callId: string) {
+  return `${mppCallReserveReference(threadId, callId, 0).replace(/:0$/, "")}:%`;
+}
+
+type DbTransaction = Parameters<
+  Parameters<ReturnType<typeof getDb>["transaction"]>[0]
+>[0];
+
+async function getReservedMppCallAmount(
+  tx: DbTransaction,
+  fanId: string,
+  threadId: string,
+  callId: string,
+) {
+  const reserveLike = mppCallReserveReferenceLike(threadId, callId);
+  const [reserved] = await tx
+    .select({
+      amount: sql<string>`COALESCE(SUM((-1) * ${custodialLedger.amount}), 0)`,
+    })
+    .from(custodialLedger)
+    .where(
+      and(
+        eq(custodialLedger.userId, fanId),
+        eq(custodialLedger.eventType, "mpp_call_debit"),
+        sql`${custodialLedger.reference} LIKE ${reserveLike}`,
+      ),
+    );
+  return reserved?.amount ?? "0";
+}
+
+export async function getMppCallEscrowAmount({
+  fanId,
+  threadId,
+  callId,
+}: {
+  fanId: string;
+  threadId: string;
+  callId: string;
+}) {
+  return getDb().transaction((tx) =>
+    getReservedMppCallAmount(tx, fanId, threadId, callId),
+  );
+}
+
+export async function getMppCallEscrowStatus({
+  fanId,
+  creatorId,
+  threadId,
+  callId,
+}: {
+  fanId: string;
+  creatorId: string;
+  threadId: string;
+  callId: string;
+}) {
+  const settleRef = mppCallSettleReference(threadId, callId);
+  const settledLike = `${settleRef}|%`;
+
+  return getDb().transaction(async (tx) => {
+    const existingSettlement = await tx.query.custodialLedger.findFirst({
+      where: and(
+        eq(custodialLedger.userId, creatorId),
+        eq(custodialLedger.eventType, "mpp_call_credit"),
+        sql`${custodialLedger.reference} LIKE ${settledLike}`,
+      ),
+    });
+    if (existingSettlement) {
+      const [, txHash = ""] = existingSettlement.reference.split("|");
+      const balance = await tx.query.userBalances.findFirst({
+        where: eq(userBalances.userId, fanId),
+      });
+      return {
+        status: "settled" as const,
+        amount: existingSettlement.amount,
+        txHash,
+        balance: balance?.availableBalance ?? "0",
+        escrowedBalance: balance?.escrowedBalance ?? "0",
+      };
+    }
+
+    return {
+      status: "reserved" as const,
+      amount: await getReservedMppCallAmount(tx, fanId, threadId, callId),
+    };
+  });
+}
+
+export async function reserveMppCallEscrow({
   fanId,
   creatorId,
   threadId,
@@ -1072,9 +1180,9 @@ export async function chargeMppCallTick({
   amount: string;
   chargedSeconds: number;
   tick: number;
-}): Promise<MppCallTickResult> {
+}): Promise<MppCallReserveResult> {
   if (fanId === creatorId) return { status: "self_call" };
-  const reference = `mpp-call:${threadId}:${callId}:${tick}`;
+  const reference = mppCallReserveReference(threadId, callId, tick);
 
   return getDb().transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${reference}))`);
@@ -1083,10 +1191,14 @@ export async function chargeMppCallTick({
       where: and(eq(custodialLedger.userId, fanId), eq(custodialLedger.reference, reference)),
     });
     if (existing) {
+      const current = await tx.query.userBalances.findFirst({
+        where: eq(userBalances.userId, fanId),
+      });
       return {
-        status: "already_charged",
+        status: "already_reserved",
         txHash: reference,
         balance: existing.balanceAfter,
+        escrowedBalance: current?.escrowedBalance ?? "0",
         amount,
         chargedSeconds,
       };
@@ -1098,6 +1210,7 @@ export async function chargeMppCallTick({
       .update(userBalances)
       .set({
         availableBalance: sql`${userBalances.availableBalance} - ${amount}`,
+        escrowedBalance: sql`${userBalances.escrowedBalance} + ${amount}`,
         updatedAt: new Date(),
       })
       .where(
@@ -1128,39 +1241,154 @@ export async function chargeMppCallTick({
     });
 
     return {
-      status: "charged",
+      status: "reserved",
       txHash: reference,
       balance: fanBalance.availableBalance,
+      escrowedBalance: fanBalance.escrowedBalance,
       amount,
       chargedSeconds,
     };
   });
 }
 
-export async function rollbackMppCallTick({
+export async function settleMppCallEscrow({
   fanId,
-  amount,
-  reference,
+  creatorId,
+  threadId,
+  callId,
+  paymentTxHash,
 }: {
   fanId: string;
-  amount: string;
-  reference: string;
-}) {
-  return getDb().transaction(async (tx) => {
-    const existing = await tx.query.custodialLedger.findFirst({
-      where: and(eq(custodialLedger.userId, fanId), eq(custodialLedger.reference, reference)),
-    });
-    if (!existing) return null;
+  creatorId: string;
+  threadId: string;
+  callId: string;
+  paymentTxHash: string;
+}): Promise<MppCallSettleResult> {
+  if (fanId === creatorId) return { status: "self_call" };
+  const settleRef = mppCallSettleReference(threadId, callId);
+  const settledLike = `${settleRef}|%`;
 
-    await tx.delete(custodialLedger).where(eq(custodialLedger.id, existing.id));
+  return getDb().transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${settleRef}))`);
+
+    const existingSettlement = await tx.query.custodialLedger.findFirst({
+      where: and(
+        eq(custodialLedger.userId, creatorId),
+        eq(custodialLedger.eventType, "mpp_call_credit"),
+        sql`${custodialLedger.reference} LIKE ${settledLike}`,
+      ),
+    });
+    if (existingSettlement) {
+      const [, existingTxHash = paymentTxHash] = existingSettlement.reference.split("|");
+      const balance = await tx.query.userBalances.findFirst({
+        where: eq(userBalances.userId, fanId),
+      });
+      return {
+        status: "already_settled",
+        txHash: existingTxHash,
+        balance: balance?.availableBalance ?? "0",
+        escrowedBalance: balance?.escrowedBalance ?? "0",
+        amount: existingSettlement.amount,
+      };
+    }
+
+    const amount = await getReservedMppCallAmount(tx, fanId, threadId, callId);
+    if (Number(amount) <= 0) {
+      const balance = await tx.query.userBalances.findFirst({
+        where: eq(userBalances.userId, fanId),
+      });
+      return {
+        status: "nothing_to_settle",
+        balance: balance?.availableBalance ?? "0",
+        escrowedBalance: balance?.escrowedBalance ?? "0",
+      };
+    }
+
     const [balance] = await tx
+      .update(userBalances)
+      .set({
+        escrowedBalance: sql`${userBalances.escrowedBalance} - ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(userBalances.userId, fanId),
+          sql`${userBalances.escrowedBalance} >= ${amount}`,
+        ),
+      )
+      .returning();
+
+    await tx.insert(userBalances).values({ userId: creatorId }).onConflictDoNothing();
+    const [creatorBalance] = await tx
       .update(userBalances)
       .set({
         availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
         updatedAt: new Date(),
       })
+      .where(eq(userBalances.userId, creatorId))
+      .returning();
+
+    await tx.insert(custodialLedger).values({
+      userId: creatorId,
+      eventType: "mpp_call_credit",
+      amount,
+      balanceAfter: creatorBalance.availableBalance,
+      reference: `${settleRef}|${paymentTxHash}`,
+    });
+
+    return {
+      status: "settled",
+      txHash: paymentTxHash,
+      balance: balance?.availableBalance ?? "0",
+      escrowedBalance: balance?.escrowedBalance ?? "0",
+      amount,
+    };
+  });
+}
+
+export async function releaseMppCallEscrow({
+  fanId,
+  threadId,
+  callId,
+}: {
+  fanId: string;
+  threadId: string;
+  callId: string;
+}) {
+  const releaseRef = `${mppCallSettleReference(threadId, callId)}:release`;
+  return getDb().transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${releaseRef}))`);
+    const amount = await getReservedMppCallAmount(tx, fanId, threadId, callId);
+    if (Number(amount) <= 0) return null;
+
+    const reserveLike = mppCallReserveReferenceLike(threadId, callId);
+    await tx
+      .delete(custodialLedger)
+      .where(
+        and(
+          eq(custodialLedger.userId, fanId),
+          eq(custodialLedger.eventType, "mpp_call_debit"),
+          sql`${custodialLedger.reference} LIKE ${reserveLike}`,
+        ),
+      );
+
+    const [balance] = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+        escrowedBalance: sql`${userBalances.escrowedBalance} - ${amount}`,
+        updatedAt: new Date(),
+      })
       .where(eq(userBalances.userId, fanId))
       .returning();
+
+    await tx.insert(custodialLedger).values({
+      userId: fanId,
+      eventType: "refund",
+      amount,
+      balanceAfter: balance.availableBalance,
+      reference: releaseRef,
+    });
 
     return balance;
   });

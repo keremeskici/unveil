@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
@@ -88,6 +88,7 @@ export function PostCard({
   const [unlocked, setUnlocked] = useState(initialUnlocked ?? false);
   const [signedUrl, setSignedUrl] = useState<string | null>(initialSignedUrl ?? null);
   const [messaging, setMessaging] = useState(false);
+  const initiallyRevealedRef = useRef(Boolean(initialUnlocked && initialSignedUrl));
 
   // Social state (optimistic; seeded from the server-rendered feed).
   const [liked, setLiked] = useState(post.social?.liked ?? false);
@@ -323,6 +324,7 @@ export function PostCard({
               revealedUrl={signedUrl}
               revealed={revealed}
               overlay={overlay}
+              animateReveal={!initiallyRevealedRef.current}
             />
           ) : (
             <RevealMedia
@@ -332,6 +334,7 @@ export function PostCard({
               alt={post.title}
               priority={priority}
               overlay={overlay}
+              animateReveal={!initiallyRevealedRef.current}
             />
           );
         })()}

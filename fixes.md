@@ -67,6 +67,8 @@
 - [x] Swap to the latest red eye logo and show only one brand mark on the login screen.
 - [x] Revert custom brand font back to the original app font and show only the word UNVEIL on the login screen.
 - [x] Show logo plus title on onboarding, and show only the word UNVEIL in the signed-in top bar.
+- [x] Skip the reveal animation for media that was already unlocked before the page loaded.
+- [x] Replace the tip success micro-confirmation with a red full-screen upward-arrow completion animation.
 
 ## Agent Findings
 

@@ -13,6 +13,20 @@ const OAUTH_ERROR_PARAMS = [
   "clerk_error",
 ];
 
+const OAUTH_PAYLOAD_PARAMS = [
+  "code",
+  "state",
+  "ticket",
+  "__clerk_status",
+  "__clerk_created_session",
+  "__clerk_handshake",
+  "__clerk_synced",
+];
+
+function hasCallbackPayload(searchParams: URLSearchParams) {
+  return OAUTH_PAYLOAD_PARAMS.some((param) => searchParams.has(param));
+}
+
 function getCallbackError(searchParams: URLSearchParams) {
   for (const param of OAUTH_ERROR_PARAMS) {
     const value = searchParams.get(param);
@@ -49,7 +63,17 @@ export default function SsoCallbackPage() {
   useEffect(() => {
     const callbackError = getCallbackError(new URLSearchParams(window.location.search));
     if (!callbackError) {
-      setIsReady(true);
+      const searchParams = new URLSearchParams(window.location.search);
+      if (hasCallbackPayload(searchParams)) {
+        setIsReady(true);
+        return;
+      }
+
+      const nextParams = new URLSearchParams({
+        oauth_error: "OAuth sign-in was canceled.",
+      });
+      setError("missing_callback_payload");
+      router.replace(`/sign-in?${nextParams.toString()}`);
       return;
     }
 

@@ -11,6 +11,7 @@ type OAuthStrategy = "oauth_google" | "oauth_x";
 type SignUpStep = "credentials" | "verification";
 
 const OAUTH_STATE_KEY_PREFIXES = ["__clerk_oauth", "clerk_oauth", "oauth"];
+const OAUTH_STATE_KEY_PARTS = ["oauth", "sso", "redirect"];
 
 function errorMessage(err: unknown) {
   const clerkError = err as { errors?: { longMessage?: string; message?: string }[] };
@@ -29,7 +30,14 @@ function clearStaleOAuthState() {
       const key = storage.key(i);
       if (!key) continue;
       const normalized = key.toLowerCase();
-      if (OAUTH_STATE_KEY_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+      const isKnownOAuthKey = OAUTH_STATE_KEY_PREFIXES.some((prefix) =>
+        normalized.startsWith(prefix),
+      );
+      const isClerkOAuthKey =
+        normalized.includes("clerk") &&
+        OAUTH_STATE_KEY_PARTS.some((part) => normalized.includes(part));
+
+      if (isKnownOAuthKey || isClerkOAuthKey) {
         storage.removeItem(key);
       }
     }

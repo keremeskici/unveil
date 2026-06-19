@@ -16,7 +16,7 @@ export function CurtainMark({
         width,
         height,
         borderRadius: radius,
-        backgroundImage: "url('/unveil-eye-logo.png')",
+        backgroundImage: "url('/unveil-eye-logo-v2.png')",
         backgroundPosition: "center",
         backgroundSize: "cover",
         boxShadow: glow,
@@ -44,7 +44,7 @@ export function Wordmark({
       <span
         className="font-bold"
         style={{
-          fontFamily: "var(--font-brand-inter), sans-serif",
+          fontFamily: "var(--font-brand-manrope), sans-serif",
           fontSize: size,
           letterSpacing: 0,
         }}

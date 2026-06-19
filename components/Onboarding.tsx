@@ -408,21 +408,21 @@ export function Onboarding() {
           paddingBottom: "max(18px, env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <div className="mb-6 flex flex-col items-center justify-center gap-4">
+        <div className="mb-6 flex items-center justify-center gap-4">
           <Image
-            src="/unveil-eye-logo.png"
+            src="/unveil-eye-logo-v2.png"
             alt=""
-            width={88}
-            height={88}
+            width={92}
+            height={92}
             priority
-            className="h-[88px] w-[88px] object-contain"
+            className="h-[92px] w-[92px] object-contain"
             style={{ mixBlendMode: "screen" }}
           />
           <span
             className="font-bold"
             style={{
-              fontFamily: "var(--font-brand-inter), sans-serif",
-              fontSize: 25,
+              fontFamily: "var(--font-brand-manrope), sans-serif",
+              fontSize: 27,
               letterSpacing: 0,
             }}
           >

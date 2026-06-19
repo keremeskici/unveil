@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Manrope } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const brandInter = Inter({
-  variable: "--font-brand-inter",
+const brandManrope = Manrope({
+  variable: "--font-brand-manrope",
   subsets: ["latin"],
 });
 
@@ -80,7 +80,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${brandInter.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${brandManrope.variable} h-full antialiased`}
     >
       <body className="bg-bg text-text flex min-h-full flex-col">
         <ClerkProvider>

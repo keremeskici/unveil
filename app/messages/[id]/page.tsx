@@ -385,6 +385,10 @@ function CallSheet({
   const ringTimerRef = useRef<number | null>(null);
   const rate = 0.05;
   const secondsRef = useRef(0);
+  const reserveTickRef = useRef(0);
+  const reservedSecondsRef = useRef(0);
+  const reserveIntervalRef = useRef<number | null>(null);
+  const reservePromiseRef = useRef<Promise<boolean> | null>(null);
 
   function nextCallId() {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -402,22 +406,95 @@ function CallSheet({
     return () => window.clearInterval(id);
   }, [phase]);
 
+  const clearReserveInterval = useCallback(() => {
+    if (reserveIntervalRef.current) {
+      window.clearInterval(reserveIntervalRef.current);
+      reserveIntervalRef.current = null;
+    }
+  }, []);
+
+  const reserveCallSeconds = useCallback(
+    async (secondsToReserve: number) => {
+      if (!callIdRef.current || secondsToReserve < 1) return true;
+      if (reservePromiseRef.current) {
+        const previousOk = await reservePromiseRef.current;
+        if (!previousOk) return false;
+      }
+
+      const promise = (async () => {
+        if (!callIdRef.current) return true;
+        reserveTickRef.current += 1;
+        const tick = reserveTickRef.current;
+
+        const res = await fetch(`/api/messages/${threadId}/call`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "reserve",
+            callId: callIdRef.current,
+            tick,
+            chargedSeconds: secondsToReserve,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          detail?: string;
+          chargedSeconds?: number;
+        };
+
+        if (res.status === 402) {
+          setError(body.detail ?? "Add funds to continue this call.");
+          return false;
+        }
+        if (!res.ok) {
+          setError(body.error ?? "Could not reserve this call.");
+          return false;
+        }
+
+        reservedSecondsRef.current += body.chargedSeconds ?? secondsToReserve;
+        window.dispatchEvent(new Event("veil:balance-changed"));
+        return true;
+      })();
+
+      reservePromiseRef.current = promise;
+      try {
+        return await promise;
+      } finally {
+        if (reservePromiseRef.current === promise) reservePromiseRef.current = null;
+      }
+    },
+    [threadId],
+  );
+
   const settleCall = useCallback(async () => {
     if (!callIdRef.current) return;
     const duration = secondsRef.current;
+    const callId = callIdRef.current;
+    clearReserveInterval();
     setPhase("settling");
     setError(null);
     if (duration < 1) {
       setPhase("idle");
+      callIdRef.current = null;
       return;
     }
     try {
+      if (reservePromiseRef.current) await reservePromiseRef.current;
+      const remainingSeconds = duration - reservedSecondsRef.current;
+      if (remainingSeconds > 0) {
+        const reserved = await reserveCallSeconds(remainingSeconds);
+        if (!reserved && reservedSecondsRef.current < 1) {
+          setPhase("idle");
+          return;
+        }
+      }
+
       const res = await fetch(`/api/messages/${threadId}/call`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          callId: callIdRef.current,
-          tick: 1,
+          action: "settle",
+          callId,
           chargedSeconds: duration,
         }),
       });
@@ -449,8 +526,29 @@ function CallSheet({
       setPhase("idle");
     } finally {
       callIdRef.current = null;
+      reserveTickRef.current = 0;
+      reservedSecondsRef.current = 0;
+      reservePromiseRef.current = null;
     }
-  }, [threadId]);
+  }, [clearReserveInterval, reserveCallSeconds, threadId]);
+
+  useEffect(() => {
+    if (phase !== "connected") {
+      clearReserveInterval();
+      return;
+    }
+
+    reserveIntervalRef.current = window.setInterval(() => {
+      void reserveCallSeconds(5).then((ok) => {
+        if (!ok) {
+          clearReserveInterval();
+          void settleCall();
+        }
+      });
+    }, 5000);
+
+    return clearReserveInterval;
+  }, [clearReserveInterval, phase, reserveCallSeconds, settleCall]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -458,8 +556,9 @@ function CallSheet({
     return () => {
       document.body.style.overflow = previousOverflow;
       if (ringTimerRef.current) window.clearTimeout(ringTimerRef.current);
+      clearReserveInterval();
     };
-  }, []);
+  }, [clearReserveInterval]);
 
   const total = `$${(chargedSeconds * rate).toFixed(2)}`;
   const estimatedTotal = `$${(seconds * rate).toFixed(2)}`;
@@ -481,6 +580,9 @@ function CallSheet({
     setChargedSeconds(0);
     setSeconds(0);
     secondsRef.current = 0;
+    reserveTickRef.current = 0;
+    reservedSecondsRef.current = 0;
+    clearReserveInterval();
     callIdRef.current = nextCallId();
     setPhase("ringing");
     if (ringTimerRef.current) window.clearTimeout(ringTimerRef.current);
@@ -495,10 +597,31 @@ function CallSheet({
       if (ringTimerRef.current) window.clearTimeout(ringTimerRef.current);
       ringTimerRef.current = null;
       callIdRef.current = null;
+      reserveTickRef.current = 0;
+      reservedSecondsRef.current = 0;
+      reservePromiseRef.current = null;
       setPhase("idle");
       return;
     }
     if (phase === "connected") void settleCall();
+  };
+
+  const closeCallSheet = () => {
+    if (phase === "settling") return;
+    if (phase === "connected") {
+      void settleCall().finally(onClose);
+      return;
+    }
+    if (phase === "ringing") {
+      if (ringTimerRef.current) window.clearTimeout(ringTimerRef.current);
+      ringTimerRef.current = null;
+      callIdRef.current = null;
+      reserveTickRef.current = 0;
+      reservedSecondsRef.current = 0;
+      reservePromiseRef.current = null;
+      clearReserveInterval();
+    }
+    onClose();
   };
 
   return (
@@ -513,7 +636,7 @@ function CallSheet({
         aria-label="Close paid call"
         className="absolute inset-0 cursor-default bg-black/60"
         style={{ animation: "vscrim .2s ease both" }}
-        onClick={onClose}
+        onClick={closeCallSheet}
       />
       <section
         className="bg-surface border-hairline relative w-full max-w-md rounded-t-md border-t px-5 pt-5 text-center shadow-card"
@@ -524,7 +647,7 @@ function CallSheet({
       >
         <button
           type="button"
-          onClick={onClose}
+          onClick={closeCallSheet}
           aria-label="Close"
           className="text-muted hover:text-text absolute right-4 top-4 flex size-9 items-center justify-center"
         >

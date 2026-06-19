@@ -120,7 +120,7 @@ export function PartialVideoStage({
   return (
     <div
       ref={containerRef}
-      className="relative mx-3 overflow-hidden rounded-md"
+      className="feed-media relative mx-3 overflow-hidden rounded-md"
       style={{ aspectRatio: "4 / 5" }}
     >
       {/* Free, fully-blurred clip — the master clock. No scale transform: it would

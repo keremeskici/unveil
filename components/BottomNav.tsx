@@ -51,19 +51,40 @@ export function BottomNav() {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
+  const tabIndex = (path: string) => {
+    if (path.startsWith("/notifications")) return 1;
+    if (path.startsWith("/messages")) return 2;
+    return 0;
+  };
+
+  const transitionFor = (href: string) =>
+    tabIndex(href) >= tabIndex(pathname) ? ["nav-forward"] : ["nav-back"];
+
   return (
     <>
       <nav
-        className="bg-surface/95 border-hairline fixed inset-x-0 bottom-0 z-30 border-t backdrop-blur-xl"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)" }}
+        className="bg-surface border-hairline-strong fixed inset-x-0 bottom-0 z-30 border-t backdrop-blur-xl"
+        style={{
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
+          boxShadow: "0 -12px 32px rgba(0,0,0,.34)",
+        }}
       >
         <div className="mx-auto flex w-full max-w-md items-center justify-around px-4 pt-2">
-          <NavTab {...TABS[0]} active={isActive(TABS[0].href)} />
-          <NavTab {...TABS[1]} active={isActive(TABS[1].href)} />
+          <NavTab
+            {...TABS[0]}
+            active={isActive(TABS[0].href)}
+            transitionTypes={transitionFor(TABS[0].href)}
+          />
+          <NavTab
+            {...TABS[1]}
+            active={isActive(TABS[1].href)}
+            transitionTypes={transitionFor(TABS[1].href)}
+          />
 
           {/* Center: New post */}
           <Link
             href="/new"
+            transitionTypes={["nav-forward"]}
             aria-label="New post"
             className="bg-primary text-primary-fg flex h-[42px] w-[50px] items-center justify-center rounded-[14px]"
             style={{ boxShadow: "0 6px 20px var(--primary-glow)" }}
@@ -71,7 +92,11 @@ export function BottomNav() {
             <Plus size={24} strokeWidth={2.3} />
           </Link>
 
-          <NavTab {...TABS[2]} active={isActive(TABS[2].href)} />
+          <NavTab
+            {...TABS[2]}
+            active={isActive(TABS[2].href)}
+            transitionTypes={transitionFor(TABS[2].href)}
+          />
 
           {/* Profile - opens the settings drawer instead of navigating. */}
           <button
@@ -107,16 +132,19 @@ function NavTab({
   icon: Icon,
   badge,
   active,
+  transitionTypes,
 }: {
   href: string;
   label: string;
   icon: typeof Home;
   badge?: string;
   active: boolean;
+  transitionTypes: string[];
 }) {
   return (
     <Link
       href={href}
+      transitionTypes={transitionTypes}
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className="relative flex size-12 items-center justify-center transition-colors"

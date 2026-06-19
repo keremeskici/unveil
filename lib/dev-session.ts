@@ -3,7 +3,7 @@ export const DEV_AUTH_COOKIE_VALUE = "default";
 
 export const DEV_USER_PROFILE = {
   clerkId: "dev_default_user",
-  email: "dev@veil.local",
+  email: "dev@unveil.local",
   displayName: "Dev User",
   imageUrl: null,
 } as const;

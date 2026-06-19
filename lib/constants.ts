@@ -1,5 +1,5 @@
 /**
- * Network & protocol constants for Veil on Tempo (Moderato testnet).
+ * Network & protocol constants for Unveil on Tempo (Moderato testnet).
  * See .claude/.md/IMPLEMENTATION.md §2.
  */
 
@@ -50,7 +50,7 @@ export function formatUsd(amount: string | number): string {
   return `${int}.${padded}`;
 }
 
-export const APP_NAME = "Veil";
+export const APP_NAME = "Unveil";
 
 // Absolute base URL for share links / OG cards / webhooks. Resilient to the
 // common misconfigurations: an EMPTY-STRING env var (not nullish, so `?? ` keeps

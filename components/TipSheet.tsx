@@ -33,12 +33,14 @@ export function TipSheet({
   creatorName,
   creatorHandle,
   creatorAvatar,
+  closing = false,
   onClose,
 }: {
   postId: string;
   creatorName: string;
   creatorHandle: string;
   creatorAvatar: string | null;
+  closing?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -120,7 +122,9 @@ export function TipSheet({
       style={{
         background:
           "radial-gradient(120% 55% at 50% -6%, var(--tint), transparent 58%), var(--bg)",
-        animation: "vsheet .3s cubic-bezier(.22,1,.36,1) both",
+        animation: closing
+          ? "vsheetout .22s cubic-bezier(.22,1,.36,1) both"
+          : "vsheet .3s cubic-bezier(.22,1,.36,1) both",
       }}
     >
       <div className="mx-auto flex h-full w-full max-w-md flex-col">

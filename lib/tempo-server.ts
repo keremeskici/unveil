@@ -17,6 +17,21 @@ export type PaymentCheck = { ok: true } | { ok: false; reason: string };
 const eq = (a?: string, b?: string) =>
   !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
+function normalizePrivateKey(raw: string | undefined) {
+  if (!raw) return null;
+
+  const unquoted = raw.trim().replace(/^['"]|['"]$/g, "");
+  const withPrefix = unquoted.startsWith("0x") ? unquoted : `0x${unquoted}`;
+
+  if (!/^0x[0-9a-fA-F]{64}$/.test(withPrefix)) {
+    throw new Error(
+      "PLATFORM_PRIVATE_KEY must be a 32-byte hex private key, with or without 0x",
+    );
+  }
+
+  return withPrefix as `0x${string}`;
+}
+
 /**
  * Verify, server-side, that `txHash` is a real on-chain payment for this unlock:
  *  1. the receipt exists and succeeded;
@@ -90,7 +105,7 @@ export async function verifyTempoPayment(
  * AlphaUSD (the chain's fee token). Returns null if no platform key is set.
  */
 export function getPlatformClient() {
-  const pk = process.env.PLATFORM_PRIVATE_KEY as `0x${string}` | undefined;
+  const pk = normalizePrivateKey(process.env.PLATFORM_PRIVATE_KEY);
   if (!pk) return null;
   const account = privateKeyToAccount(pk);
   const chain = Chain.moderato.extend({ feeToken: ALPHA_USD });

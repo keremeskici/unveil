@@ -10,6 +10,7 @@
 
   /* Canvas & surfaces */
   --bg: #121012;
+  --header-bg: #010101;
   --surface: #1a171a;
   --surface-2: #211d21;
   --surface-3: #2a252a;
@@ -63,6 +64,7 @@
   color-scheme: light;
 
   --bg: #ffffff;
+  --header-bg: #010101;
   --surface: #ffffff;
   --surface-2: #fafaf9;
   --surface-3: #f2f0f1;
@@ -96,6 +98,7 @@
   --color-surface-3: var(--surface-3);
   --color-hairline: var(--hairline);
   --color-hairline-strong: var(--hairline-strong);
+  --color-border: var(--hairline-strong);
 
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
@@ -106,6 +109,7 @@
   --color-text: var(--text);
   --color-muted: var(--text-muted);
   --color-faint: var(--text-faint);
+  --color-muted-foreground: var(--text-muted);
 
   --color-success: var(--success);
   --color-gold: var(--gold);
@@ -289,6 +293,56 @@
     transform: translateY(0);
   }
 }
+@keyframes vsheetout {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes vtabin {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes routefade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes routeslide {
+  from {
+    transform: translateX(var(--slide-offset));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
 
 /* ============================================================
    Base
@@ -304,6 +358,77 @@ body {
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
+}
+
+::view-transition-old(.nav-forward) {
+  --slide-offset: -44px;
+  animation:
+    150ms ease-in both routefade reverse,
+    340ms var(--ease-out) both routeslide reverse;
+}
+
+::view-transition-new(.nav-forward) {
+  --slide-offset: 44px;
+  animation:
+    170ms ease-out 90ms both routefade,
+    340ms var(--ease-out) both routeslide;
+}
+
+::view-transition-old(.nav-back) {
+  --slide-offset: 44px;
+  animation:
+    150ms ease-in both routefade reverse,
+    340ms var(--ease-out) both routeslide reverse;
+}
+
+::view-transition-new(.nav-back) {
+  --slide-offset: -44px;
+  animation:
+    170ms ease-out 90ms both routefade,
+    340ms var(--ease-out) both routeslide;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 1ms !important;
+  }
+}
+
+.feed-scroll {
+  max-height: calc(100dvh - 73px);
+  scroll-behavior: auto;
+  overscroll-behavior-y: contain;
+}
+
+.feed-card {
+  min-height: calc(100dvh - 170px - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 170px - env(safe-area-inset-bottom, 0px));
+}
+
+.feed-card > .relative {
+  min-height: 0;
+}
+
+.feed-media {
+  max-height: calc(100dvh - 315px - env(safe-area-inset-bottom, 0px));
+}
+
+.feed-card :where(img, video) {
+  max-height: 100%;
+}
+
+.tab-panel {
+  animation: vtabin 220ms var(--ease-out) both;
+}
+
+.animate-accordion-down {
+  animation: accordion-down 220ms var(--ease-out) both;
+}
+
+.animate-accordion-up {
+  animation: accordion-up 180ms var(--ease-out) both;
 }
 
 button,

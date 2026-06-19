@@ -1038,6 +1038,134 @@ export async function tipWithCustodialBalance({
   });
 }
 
+export type MppCallTickResult =
+  | {
+      status: "charged";
+      txHash: string;
+      balance: string;
+      amount: string;
+      chargedSeconds: number;
+    }
+  | {
+      status: "already_charged";
+      txHash: string;
+      balance: string;
+      amount: string;
+      chargedSeconds: number;
+    }
+  | { status: "insufficient_funds"; balance: string; required: string }
+  | { status: "self_call" };
+
+export async function chargeMppCallTick({
+  fanId,
+  creatorId,
+  threadId,
+  callId,
+  amount,
+  chargedSeconds,
+  tick,
+}: {
+  fanId: string;
+  creatorId: string;
+  threadId: string;
+  callId: string;
+  amount: string;
+  chargedSeconds: number;
+  tick: number;
+}): Promise<MppCallTickResult> {
+  if (fanId === creatorId) return { status: "self_call" };
+  const reference = `mpp-call:${threadId}:${callId}:${tick}`;
+
+  return getDb().transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${reference}))`);
+
+    const existing = await tx.query.custodialLedger.findFirst({
+      where: and(eq(custodialLedger.userId, fanId), eq(custodialLedger.reference, reference)),
+    });
+    if (existing) {
+      return {
+        status: "already_charged",
+        txHash: reference,
+        balance: existing.balanceAfter,
+        amount,
+        chargedSeconds,
+      };
+    }
+
+    await tx.insert(userBalances).values({ userId: fanId }).onConflictDoNothing();
+
+    const [fanBalance] = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} - ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(userBalances.userId, fanId),
+          sql`${userBalances.availableBalance} >= ${amount}`,
+        ),
+      )
+      .returning();
+
+    if (!fanBalance) {
+      const current = await tx.query.userBalances.findFirst({
+        where: eq(userBalances.userId, fanId),
+      });
+      return {
+        status: "insufficient_funds",
+        balance: current?.availableBalance ?? "0",
+        required: amount,
+      };
+    }
+
+    await tx.insert(custodialLedger).values({
+      userId: fanId,
+      eventType: "mpp_call_debit",
+      amount: `-${amount}`,
+      balanceAfter: fanBalance.availableBalance,
+      reference,
+    });
+
+    return {
+      status: "charged",
+      txHash: reference,
+      balance: fanBalance.availableBalance,
+      amount,
+      chargedSeconds,
+    };
+  });
+}
+
+export async function rollbackMppCallTick({
+  fanId,
+  amount,
+  reference,
+}: {
+  fanId: string;
+  amount: string;
+  reference: string;
+}) {
+  return getDb().transaction(async (tx) => {
+    const existing = await tx.query.custodialLedger.findFirst({
+      where: and(eq(custodialLedger.userId, fanId), eq(custodialLedger.reference, reference)),
+    });
+    if (!existing) return null;
+
+    await tx.delete(custodialLedger).where(eq(custodialLedger.id, existing.id));
+    const [balance] = await tx
+      .update(userBalances)
+      .set({
+        availableBalance: sql`${userBalances.availableBalance} + ${amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(userBalances.userId, fanId))
+      .returning();
+
+    return balance;
+  });
+}
+
 // ── Per-region unlocks (partial posts) ───────────────────────────────────────
 // Exact mirror of the post-unlock trio above, keyed on (fanId, postRegionId).
 // Every region is charged the single `posts.unlockPrice`. The ledger row still

@@ -84,7 +84,7 @@ export function VideoStage({
 
   return (
     <div
-      className="relative mx-3 overflow-hidden rounded-md"
+      className="feed-media relative mx-3 overflow-hidden rounded-md"
       style={{ aspectRatio: "4 / 5" }}
     >
       {/* Blurred base teaser — always underneath. */}

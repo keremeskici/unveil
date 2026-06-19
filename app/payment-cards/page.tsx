@@ -244,7 +244,7 @@ export default function PaymentCardsPage() {
             <ArrowLeft size={22} strokeWidth={2} />
           </button>
           <h1 className="flex-1 text-xl font-bold leading-none">
-            Payment cards
+            Billing
           </h1>
           <button
             type="button"
@@ -254,7 +254,7 @@ export default function PaymentCardsPage() {
           </button>
           <button
             type="button"
-            aria-label="Add payment card"
+            aria-label="Add billing method"
             onClick={() => setSheetOpen(true)}
             className="text-muted hover:text-text -mr-2 flex size-[38px] items-center justify-center"
           >
@@ -266,7 +266,7 @@ export default function PaymentCardsPage() {
         <div className="border-hairline border-t">
           <div className="mx-auto flex h-[48px] w-full max-w-md overflow-hidden px-[18px]">
             <TabButton active={tab === "cards"} onClick={() => setTab("cards")}>
-              YOUR CARDS
+              BILLING
             </TabButton>
             <TabButton active={tab === "payments"} onClick={() => setTab("payments")}>
               PAYMENTS
@@ -277,7 +277,7 @@ export default function PaymentCardsPage() {
 
       <section className="mx-auto min-h-[calc(100dvh-104px)] w-full max-w-md flex-1 pb-28">
         {tab === "cards" && (
-          <div>
+          <div key="cards" className="tab-panel">
             <section className="border-hairline px-[18px] py-6">
               <div className="tabular text-[28px] font-bold leading-none">
                 {money(account?.availableBalance ?? "0")}
@@ -289,14 +289,14 @@ export default function PaymentCardsPage() {
 
             <section className="border-hairline border-y px-[18px] py-6">
               <h2 className="text-faint text-[13px] font-bold tracking-[0.04em]">
-                ADD FUNDS TO YOUR WALLET
+                ADD FUNDS
               </h2>
               <Button
                 onClick={() => setSheetOpen(true)}
                 className="mt-7 w-full"
               >
                 <CreditCard size={18} />
-                ADD A PAYMENT CARD
+                ADD BILLING METHOD
               </Button>
               <button
                 type="button"
@@ -323,11 +323,11 @@ export default function PaymentCardsPage() {
             <section className="px-[18px] py-7">
               <div className="flex items-center justify-between">
                 <h2 className="text-faint text-[13px] font-bold tracking-[0.04em]">
-                  YOUR CARDS
+                  BILLING
                 </h2>
                 <button
                   type="button"
-                  aria-label="Add payment card"
+                  aria-label="Add billing method"
                   onClick={() => setSheetOpen(true)}
                   className="text-muted hover:text-text flex size-10 items-center justify-center"
                 >
@@ -342,7 +342,7 @@ export default function PaymentCardsPage() {
                     <CreditCard size={21} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[15px] font-semibold">Mock Card</div>
+                    <div className="text-[15px] font-semibold">Mock billing card</div>
                     <div className="text-faint mt-1 text-[13px]">Ending in 4242</div>
                   </div>
                   <CheckCircle2 size={21} className="text-success" />
@@ -357,7 +357,7 @@ export default function PaymentCardsPage() {
                       onClick={() => setSheetOpen(true)}
                       className="text-primary hover:text-primary-hover font-semibold"
                     >
-                      add a new card
+                      add a billing method
                     </button>{" "}
                     to subscribe to other users or recharge your wallet.
                   </p>
@@ -374,7 +374,11 @@ export default function PaymentCardsPage() {
           </div>
         )}
 
-        {tab === "payments" && <PaymentList payments={payments} centered />}
+        {tab === "payments" && (
+          <div key="payments" className="tab-panel">
+            <PaymentList payments={payments} centered />
+          </div>
+        )}
       </section>
 
       {notice && (
@@ -392,7 +396,7 @@ export default function PaymentCardsPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <button
             type="button"
-            aria-label="Close add payment card"
+            aria-label="Close add billing method"
             className="absolute inset-0 cursor-default bg-black/55"
             style={{ animation: "vscrim .2s ease both" }}
             onClick={() => {
@@ -409,7 +413,7 @@ export default function PaymentCardsPage() {
           >
             <div className="mb-4 flex items-center justify-between gap-4">
               <h2 id="add-card-title" className="text-[22px] font-bold">
-                Add payment card
+                Add billing method
               </h2>
               <button
                 type="button"

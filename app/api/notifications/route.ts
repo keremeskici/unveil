@@ -13,12 +13,14 @@ const ACTION: Record<NotifType, string> = {
   tip: "tipped you",
   comment: "commented on",
   follow: "started following you",
+  post: "posted",
 };
 
 /**
  * GET /api/notifications — derived activity feed unioning the events on this
  * user's content: unlocks ("unveiled"), tips ("tipped you"), comments
- * ("commented on"), and follows ("started following you"). No dedicated table.
+ * ("commented on"), follows ("started following you"), and new posts from
+ * followed creators. No dedicated table.
  * Unlock/tip amounts are shown as the creator's net cut — what actually lands.
  */
 export async function GET() {

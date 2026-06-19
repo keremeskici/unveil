@@ -29,7 +29,10 @@ export function RevealMedia({
   const reduce = useReducedMotion();
 
   return (
-    <div className="relative mx-3 overflow-hidden rounded-md" style={{ aspectRatio: "4 / 5" }}>
+    <div
+      className="feed-media relative mx-3 overflow-hidden rounded-md"
+      style={{ aspectRatio: "4 / 5" }}
+    >
       {/* Blurred preview — always underneath. */}
       <Image
         src={previewUrl}

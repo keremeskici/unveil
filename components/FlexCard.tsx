@@ -49,7 +49,7 @@ export function FlexCard({
                 "conic-gradient(from 215deg,var(--primary),#7a0c24 55%,var(--primary))",
             }}
           />
-          <span className="text-[13px] font-bold tracking-[0.2em]">VEIL</span>
+          <span className="text-[13px] font-bold">UNVEIL</span>
         </div>
         <span
           className="text-gold flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[11px] font-semibold"
@@ -61,7 +61,7 @@ export function FlexCard({
 
       <div className="relative mt-7">
         <div className="text-faint text-[12px] tracking-[0.14em] uppercase">
-          VEIL balance
+          Unveil balance
         </div>
         <div className="tabular text-text mt-1 text-[40px] leading-none font-bold">
           {balance}

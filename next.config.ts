@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    viewTransition: true,
+  },
   // Pin the workspace root so a stray lockfile in a parent dir isn't picked up.
   turbopack: { root: __dirname },
   outputFileTracingRoot: __dirname,

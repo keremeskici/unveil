@@ -95,48 +95,51 @@ export default function MessagesPage() {
               </button>
             </div>
 
-            {threads === null ? (
-              <p className="text-faint mt-16 text-center text-sm">Loading…</p>
-            ) : visible.length === 0 ? (
-              <div className="mt-10">
-                <EmptyState
-                  icon={MessageCircle}
-                  title={filter === "unread" ? "All caught up" : "No messages yet"}
-                  body={
-                    filter === "unread"
-                      ? "You've read everything."
-                      : "Tap the message icon on a post to start a conversation with a creator."
-                  }
-                />
-              </div>
-            ) : (
-              <ul className="px-[18px]">
-                {visible.map((t) => (
-                  <li key={t.id} className="border-hairline border-b">
-                    <Link
-                      href={`/messages/${t.id}`}
-                      className="flex items-center gap-3.5 py-3.5"
-                    >
-                      <Avatar name={t.name} src={t.avatar} size="lg" verified />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[15px] font-semibold">{t.name}</p>
-                        <p className="text-muted mt-0.5 truncate text-[13.5px]">
-                          {t.preview}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className="text-faint text-[12px]">{timeAgo(t.at)}</span>
-                        {t.unread > 0 && (
-                          <span className="bg-primary text-primary-fg tabular flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold">
-                            {t.unread}
-                          </span>
-                        )}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div key={filter} className="tab-panel">
+              {threads === null ? (
+                <p className="text-faint mt-16 text-center text-sm">Loading…</p>
+              ) : visible.length === 0 ? (
+                <div className="mt-10">
+                  <EmptyState
+                    icon={MessageCircle}
+                    title={filter === "unread" ? "All caught up" : "No messages yet"}
+                    body={
+                      filter === "unread"
+                        ? "You've read everything."
+                        : "Tap the message icon on a post to start a conversation with a creator."
+                    }
+                  />
+                </div>
+              ) : (
+                <ul className="px-[18px]">
+                  {visible.map((t) => (
+                    <li key={t.id} className="border-hairline border-b">
+                      <Link
+                        href={`/messages/${t.id}`}
+                        transitionTypes={["nav-forward"]}
+                        className="flex items-center gap-3.5 py-3.5"
+                      >
+                        <Avatar name={t.name} src={t.avatar} size="lg" verified />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[15px] font-semibold">{t.name}</p>
+                          <p className="text-muted mt-0.5 truncate text-[13.5px]">
+                            {t.preview}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="text-faint text-[12px]">{timeAgo(t.at)}</span>
+                          {t.unread > 0 && (
+                            <span className="bg-primary text-primary-fg tabular flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold">
+                              {t.unread}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </>
         )}
       </div>

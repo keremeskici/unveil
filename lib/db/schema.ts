@@ -40,6 +40,8 @@ export const custodialLedgerTypeEnum = pgEnum("custodial_ledger_type", [
   // A tip moves balance fan → creator: the fan is debited, the creator credited.
   "tip_debit",
   "tip_credit",
+  "mpp_call_debit",
+  "mpp_call_credit",
 ]);
 
 export const platformKeyStatusEnum = pgEnum("platform_key_status", [

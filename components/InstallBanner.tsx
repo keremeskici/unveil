@@ -30,7 +30,7 @@ export function InstallBanner() {
       style={{ boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-text font-semibold">Install Veil</p>
+        <p className="text-text font-semibold">Install Unveil</p>
         <button
           type="button"
           onClick={() => setDismissed(true)}

@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Veil",
-    short_name: "Veil",
+    name: "Unveil",
+    short_name: "Unveil",
     description: "Tap to unlock premium content",
     start_url: "/",
     display: "standalone",

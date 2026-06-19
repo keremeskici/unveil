@@ -116,12 +116,11 @@ export function SettingsDrawer({
           <Divider />
           <Row
             icon={CreditCard}
-            label="Your cards"
-            hint="(to subscribe)"
+            label="Billing"
             href="/payment-cards"
             onNavigate={onClose}
           />
-          <Row icon={Building2} label="Become a creator" hint="(to earn)" />
+          <Row icon={Building2} label="Become a creator" />
           <Divider />
           <Row icon={HelpCircle} label="Help and support" />
 

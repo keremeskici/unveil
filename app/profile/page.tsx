@@ -98,7 +98,7 @@ export default function ProfilePage() {
             <div>
               <p className="text-text font-semibold">Sign in to see your profile</p>
               <p className="text-faint mt-1 text-sm">
-                Your unlocks, VEIL balance, and flex card live here.
+                Your unlocks, Unveil balance, and flex card live here.
               </p>
             </div>
             <ConnectButton />
@@ -154,7 +154,7 @@ export default function ProfilePage() {
               {loyalty?.onchain && (
                 <div className="text-faint mt-2 flex items-center justify-center gap-1.5 text-[12px]">
                   <Zap size={12} className="text-success" />
-                  VEIL minted on-chain
+                  Unveil minted on-chain
                 </div>
               )}
             </div>

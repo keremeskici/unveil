@@ -19,6 +19,15 @@ export type PostSocial = {
   saved: boolean;
 };
 
+export type BookmarkItem = {
+  id: string;
+  postId: string;
+  title: string;
+  creator: string;
+  avatar: string | null;
+  at: Date;
+};
+
 async function countPostLikes(postId: string): Promise<number> {
   const [r] = await getDb()
     .select({ n: sql<number>`COUNT(*)` })
@@ -60,6 +69,34 @@ export async function togglePostSave(userId: string, postId: string) {
   }
   await db.insert(postSaves).values({ postId, userId }).onConflictDoNothing();
   return { saved: true };
+}
+
+export async function listBookmarks(userId: string, limit = 30): Promise<BookmarkItem[]> {
+  const rows = await getDb()
+    .select({
+      id: postSaves.id,
+      postId: posts.id,
+      title: posts.title,
+      creatorUsername: users.username,
+      creatorWallet: users.walletAddress,
+      avatar: users.avatar,
+      at: postSaves.createdAt,
+    })
+    .from(postSaves)
+    .innerJoin(posts, eq(postSaves.postId, posts.id))
+    .innerJoin(users, eq(posts.creatorId, users.id))
+    .where(and(eq(postSaves.userId, userId), eq(posts.isPublished, true)))
+    .orderBy(desc(postSaves.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    postId: r.postId,
+    title: r.title,
+    creator: r.creatorUsername ?? `@${r.creatorWallet.slice(2, 8).toLowerCase()}`,
+    avatar: r.avatar,
+    at: r.at,
+  }));
 }
 
 /**
@@ -377,6 +414,13 @@ async function followedSet(
   return new Set(rows.map((r) => r.followingId));
 }
 
+export async function getFollowedCreatorIds(
+  viewerId: string | undefined,
+  creatorIds: string[],
+): Promise<Set<string>> {
+  return followedSet(viewerId, creatorIds);
+}
+
 // ── Search & discovery ──────────────────────────────────────────────────────
 
 export type CreatorResult = {
@@ -384,6 +428,7 @@ export type CreatorResult = {
   username: string;
   displayName: string | null;
   avatar: string | null;
+  walletAddress: string;
   fanCount: number;
   following: boolean;
 };
@@ -398,7 +443,14 @@ export type PostTile = {
 };
 
 function shapeCreators(
-  rows: { id: string; username: string | null; displayName: string | null; avatar: string | null; fanCount: number }[],
+  rows: {
+    id: string;
+    username: string | null;
+    displayName: string | null;
+    avatar: string | null;
+    walletAddress: string;
+    fanCount: number;
+  }[],
   followed: Set<string>,
 ): CreatorResult[] {
   return rows
@@ -408,6 +460,7 @@ function shapeCreators(
       username: r.username as string,
       displayName: r.displayName,
       avatar: r.avatar,
+      walletAddress: r.walletAddress,
       fanCount: Number(r.fanCount),
       following: followed.has(r.id),
     }));
@@ -425,6 +478,7 @@ export async function getTopCreators(
       username: users.username,
       displayName: users.displayName,
       avatar: users.avatar,
+      walletAddress: users.walletAddress,
       fanCount: sql<number>`COUNT(${follows.id})`,
     })
     .from(users)
@@ -478,6 +532,7 @@ export async function searchEverything(query: string, viewerId?: string) {
       username: users.username,
       displayName: users.displayName,
       avatar: users.avatar,
+      walletAddress: users.walletAddress,
       fanCount: sql<number>`COUNT(${follows.id})`,
     })
     .from(users)

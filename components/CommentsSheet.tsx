@@ -4,6 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Heart, Pin, X } from "lucide-react";
 import { Avatar } from "./ui/Avatar";
+import {
+  Discussion,
+  DiscussionBody,
+  DiscussionContent,
+  DiscussionExpand,
+  DiscussionItem,
+  DiscussionReplies,
+  DiscussionTitle,
+} from "./ui/discussion";
 import { useAppAuth } from "./useAppAuth";
 import { timeAgo } from "@/lib/time";
 import type { CommentNode } from "@/lib/db/social";
@@ -30,6 +39,7 @@ export function CommentsSheet({
   authorHandle,
   authorAvatar,
   postedAt,
+  closing = false,
   onClose,
   onCountChange,
 }: {
@@ -38,6 +48,7 @@ export function CommentsSheet({
   authorHandle: string;
   authorAvatar: string | null;
   postedAt?: string;
+  closing?: boolean;
   onClose: () => void;
   onCountChange?: (delta: number) => void;
 }) {
@@ -151,7 +162,11 @@ export function CommentsSheet({
       aria-modal="true"
       aria-label="Comments"
       className="bg-bg fixed inset-0 z-50 flex flex-col"
-      style={{ animation: "vsheet .3s cubic-bezier(.22,1,.36,1) both" }}
+      style={{
+        animation: closing
+          ? "vsheetout .22s cubic-bezier(.22,1,.36,1) both"
+          : "vsheet .3s cubic-bezier(.22,1,.36,1) both",
+      }}
     >
       <div className="mx-auto flex h-full w-full max-w-md flex-col">
         {/* Header */}
@@ -172,9 +187,9 @@ export function CommentsSheet({
         </div>
 
         {/* Scroll area */}
-        <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto px-3 py-2">
           {/* Caption row */}
-          <div className="border-hairline flex gap-2.5 border-b px-4 pt-[15px] pb-3">
+          <div className="border-hairline bg-surface-2 mb-2 flex gap-2.5 rounded-md border px-3 py-3">
             <Avatar name={authorHandle} src={authorAvatar} size="sm" />
             <div className="min-w-0 flex-1">
               <p className="text-text text-sm leading-relaxed">
@@ -193,53 +208,79 @@ export function CommentsSheet({
               No comments yet — be the first.
             </p>
           ) : (
-            items.map((c) => (
-              <div key={c.id} className="flex gap-2.5 px-4 py-3">
-                <Avatar name={c.who} src={c.avatar} size="sm" />
-                <div className="min-w-0 flex-1">
-                  {c.pinned && (
-                    <div className="text-faint mb-1 flex items-center gap-1.5 text-[11px]">
-                      <Pin size={12} />
-                      <span>Pinned by creator</span>
-                    </div>
-                  )}
-                  <p className="text-text text-sm leading-relaxed">
-                    <span className="font-semibold">{c.who}</span> {c.text}
-                  </p>
-                  <div className="text-faint mt-1.5 flex items-center gap-4 text-xs font-semibold">
-                    <span>{timeAgo(c.at)}</span>
-                    {c.likeCount > 0 && <span>{c.likeCount} likes</span>}
-                    <button
-                      type="button"
-                      onClick={() => startReply(c.id, c.who)}
-                      className="hover:text-text"
-                    >
-                      Reply
-                    </button>
-                  </div>
-
-                  {c.replies.map((r) => (
-                    <div key={r.id} className="mt-3 flex gap-2.5">
-                      <Avatar name={r.who} src={r.avatar} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-text text-[13.5px] leading-relaxed">
-                          <span className="font-semibold">{r.who}</span> {r.text}
-                        </p>
-                        <div className="text-faint mt-1.5 flex items-center gap-4 text-xs font-semibold">
-                          <span>{timeAgo(r.at)}</span>
-                          {r.likeCount > 0 && <span>{r.likeCount} likes</span>}
+            <Discussion type="multiple" className="space-y-2">
+              {items.map((c) => (
+                <DiscussionItem
+                  key={c.id}
+                  value={c.id}
+                  className="border-hairline bg-surface rounded-md border px-3 py-3 pl-3 before:left-3 before:top-3 before:bottom-3"
+                >
+                  <DiscussionContent className="gap-2.5">
+                    <Avatar name={c.who} src={c.avatar} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      {c.pinned && (
+                        <div className="text-faint mb-1 flex items-center gap-1.5 text-[11px]">
+                          <Pin size={12} />
+                          <span>Pinned by creator</span>
                         </div>
+                      )}
+                      <DiscussionTitle className="text-text">{c.who}</DiscussionTitle>
+                      <DiscussionBody className="text-text">{c.text}</DiscussionBody>
+                      <div className="text-faint mt-1.5 flex items-center gap-4 text-xs font-semibold">
+                        <span>{timeAgo(c.at)}</span>
+                        {c.likeCount > 0 && <span>{c.likeCount} likes</span>}
+                        <button
+                          type="button"
+                          onClick={() => startReply(c.id, c.who)}
+                          className="hover:text-text"
+                        >
+                          Reply
+                        </button>
                       </div>
-                      <LikeBtn
-                        liked={r.liked}
-                        onClick={() => toggleLike(r.id, true, c.id)}
-                      />
+                      {c.replies.length > 0 && (
+                        <DiscussionExpand className="mt-2 max-w-fit">
+                          {c.replies.length === 1
+                            ? "Show reply"
+                            : `Show ${c.replies.length} replies`}
+                        </DiscussionExpand>
+                      )}
                     </div>
-                  ))}
-                </div>
-                <LikeBtn liked={c.liked} onClick={() => toggleLike(c.id, false)} />
-              </div>
-            ))
+                    <LikeBtn liked={c.liked} onClick={() => toggleLike(c.id, false)} />
+                  </DiscussionContent>
+                  {c.replies.length > 0 && (
+                    <DiscussionReplies className="pt-1 pl-9">
+                      {c.replies.map((r) => (
+                        <DiscussionItem
+                          key={r.id}
+                          value={r.id}
+                          className="mt-3 pl-3 before:bg-hairline"
+                        >
+                          <DiscussionContent className="gap-2.5">
+                            <Avatar name={r.who} src={r.avatar} size="sm" />
+                            <div className="min-w-0 flex-1">
+                              <DiscussionTitle className="text-text">
+                                {r.who}
+                              </DiscussionTitle>
+                              <DiscussionBody className="text-text text-[13.5px]">
+                                {r.text}
+                              </DiscussionBody>
+                              <div className="text-faint mt-1.5 flex items-center gap-4 text-xs font-semibold">
+                                <span>{timeAgo(r.at)}</span>
+                                {r.likeCount > 0 && <span>{r.likeCount} likes</span>}
+                              </div>
+                            </div>
+                            <LikeBtn
+                              liked={r.liked}
+                              onClick={() => toggleLike(r.id, true, c.id)}
+                            />
+                          </DiscussionContent>
+                        </DiscussionItem>
+                      ))}
+                    </DiscussionReplies>
+                  )}
+                </DiscussionItem>
+              ))}
+            </Discussion>
           )}
           <div className="h-2" />
         </div>
@@ -260,7 +301,7 @@ export function CommentsSheet({
 
         {/* Composer */}
         <div
-          className="border-hairline bg-surface border-t px-3.5 pt-2"
+          className="border-hairline bg-surface border-t px-3.5 pt-2 transition-transform duration-[220ms] ease-veil focus-within:-translate-y-5 motion-reduce:transform-none motion-reduce:transition-none"
           style={{
             paddingBottom: "max(20px, env(safe-area-inset-bottom, 0px))",
           }}

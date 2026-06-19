@@ -6,6 +6,7 @@ import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { Eye, EyeOff, Lock } from "lucide-react";
 import { isDevAuthEnabled } from "@/lib/dev-session";
 import { notifyDevAuthChanged, useAppAuth } from "./useAppAuth";
+import { CurtainMark } from "./Wordmark";
 
 type AuthMode = "sign-in" | "sign-up";
 type OAuthStrategy = "oauth_google" | "oauth_x";
@@ -322,39 +323,35 @@ export function Onboarding() {
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto"
+      className="fixed inset-0 z-50 overflow-hidden"
       style={{
         background:
-          "radial-gradient(120% 60% at 50% -8%, var(--tint), transparent 60%), var(--bg)",
+          "radial-gradient(120% 60% at 50% -8%, rgba(194,20,59,.18), transparent 60%), var(--bg)",
       }}
     >
       <div
-        className="mx-auto flex w-full max-w-md flex-col px-7 pb-10"
-        style={{ paddingTop: "max(56px, calc(env(safe-area-inset-top, 0px) + 20px))" }}
+        className="mx-auto flex h-full w-full max-w-md flex-col px-7"
+        style={{
+          paddingTop: "max(28px, calc(env(safe-area-inset-top, 0px) + 14px))",
+          paddingBottom: "max(18px, env(safe-area-inset-bottom, 0px))",
+        }}
       >
-        <div className="mb-6 flex items-center gap-[11px]">
-          <span
-            className="size-[34px] rounded-full"
-            style={{
-              background:
-                "conic-gradient(from 215deg,var(--primary),#7a0c24 55%,var(--primary))",
-              boxShadow: "0 0 18px var(--glow)",
-            }}
-            aria-hidden
+        <div className="mb-5 flex items-center justify-center gap-[11px]">
+          <CurtainMark
+            width={48}
+            height={48}
+            radius={12}
+            glow="0 0 24px rgba(255,20,40,.44)"
           />
           <span
             className="font-bold"
-            style={{ fontSize: 25, letterSpacing: "0.16em", paddingLeft: "0.04em" }}
+            style={{ fontSize: 25, letterSpacing: 0 }}
           >
-            VEIL
+            UNVEIL
           </span>
         </div>
 
-        <h1 className="m-0 mb-[30px] max-w-[330px] text-[29px] font-bold leading-[1.14]">
-          Log in to support your favorite creators
-        </h1>
-
-        <div className="text-text mb-[13px] text-sm font-semibold">
+        <div className="text-text mb-3 text-sm font-semibold">
           {isVerifyingClientTrust
             ? "Verify email"
             : mode === "sign-in"
@@ -374,7 +371,7 @@ export function Onboarding() {
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            className="bg-surface-2 text-text placeholder:text-faint mb-[18px] h-[54px] w-full rounded-[14px] px-[18px] text-base outline-none focus:border-[color:var(--primary)]"
+            className="bg-surface-2 text-text placeholder:text-faint mb-4 h-[52px] w-full rounded-[14px] px-[18px] text-base outline-none focus:border-[color:var(--primary)]"
             style={{ border: "1px solid var(--hairline-2)" }}
           />
         ) : (
@@ -388,11 +385,11 @@ export function Onboarding() {
               type="email"
               autoComplete="email"
               spellCheck={false}
-              className="bg-surface-2 text-text placeholder:text-faint mb-3.5 h-[54px] w-full rounded-[14px] px-[18px] text-base outline-none focus:border-[color:var(--primary)]"
+              className="bg-surface-2 text-text placeholder:text-faint mb-3 h-[52px] w-full rounded-[14px] px-[18px] text-base outline-none focus:border-[color:var(--primary)]"
               style={{ border: "1px solid var(--hairline-2)" }}
             />
 
-            <div className="relative mb-[18px]">
+            <div className="relative mb-4">
               <input
                 aria-label="Password"
                 name="password"
@@ -401,14 +398,14 @@ export function Onboarding() {
                 placeholder="Password"
                 type={showPw ? "text" : "password"}
                 autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-                className="bg-surface-2 text-text placeholder:text-faint h-[54px] w-full rounded-[14px] pl-[18px] pr-[52px] text-base outline-none focus:border-[color:var(--primary)]"
+                className="bg-surface-2 text-text placeholder:text-faint h-[52px] w-full rounded-[14px] pl-[18px] pr-[52px] text-base outline-none focus:border-[color:var(--primary)]"
                 style={{ border: "1px solid var(--hairline-2)" }}
               />
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
                 aria-label={showPw ? "Hide password" : "Show password"}
-                className="text-faint absolute right-0 top-0 flex h-[54px] w-[50px] items-center justify-center"
+                className="text-faint absolute right-0 top-0 flex h-[52px] w-[50px] items-center justify-center"
               >
                 {showPw ? <EyeOff size={22} strokeWidth={1.9} /> : <Eye size={22} strokeWidth={1.9} />}
               </button>
@@ -428,7 +425,7 @@ export function Onboarding() {
                 : submitEmailPassword
           }
           disabled={!canSubmit}
-          className="h-[54px] w-full rounded-pill text-[15px] font-bold tracking-[0.04em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985]"
+          className="h-[52px] w-full rounded-pill text-[15px] font-bold transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985]"
           style={
             canSubmit
               ? { background: "var(--primary)", color: "#fff", boxShadow: "0 8px 28px var(--glow)" }
@@ -447,7 +444,7 @@ export function Onboarding() {
         </button>
 
         <p className="text-faint mt-3.5 text-[12.5px] leading-[1.55]">
-          By logging in and using Veil, you agree to our{" "}
+          By logging in and using Unveil, you agree to our{" "}
           <span className="text-primary">Terms of Service</span> and{" "}
           <span className="text-primary">Privacy Policy</span>, and confirm that you
           are at least 18 years old.
@@ -457,7 +454,7 @@ export function Onboarding() {
 
         <div
           className="text-primary flex items-center justify-center gap-3 text-sm font-semibold"
-          style={{ margin: "26px 0 22px" }}
+          style={{ margin: "18px 0 14px" }}
         >
           <button type="button" className="hover:text-primary-hover">
             Forgot password?
@@ -474,18 +471,18 @@ export function Onboarding() {
             }}
             className="hover:text-primary-hover"
           >
-            {mode === "sign-in" ? "Sign up for Veil" : "Log in instead"}
+            {mode === "sign-in" ? "Sign up for Unveil" : "Log in instead"}
           </button>
         </div>
 
-        <div className="flex flex-col gap-[13px]">
+        <div className="mt-auto flex flex-col gap-3">
           {isDevAuthEnabled() && (
             <button
               type="button"
               onClick={startDevLogin}
               disabled={isPending || isDevPending}
-              className="text-primary-fg relative flex h-[52px] w-full items-center justify-center rounded-pill text-sm font-bold tracking-[0.04em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
-              style={{ background: "var(--success)", boxShadow: "0 6px 22px rgba(43,180,119,.28)" }}
+              className="text-primary-fg relative flex h-[42px] w-full items-center justify-center rounded-pill text-xs font-bold tracking-[0.08em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
+              style={{ background: "var(--success)", boxShadow: "0 5px 18px rgba(43,180,119,.24)" }}
             >
               {isDevPending ? "OPENING DEV ACCOUNT..." : "CONTINUE AS DEV USER"}
             </button>
@@ -495,10 +492,10 @@ export function Onboarding() {
             type="button"
             onClick={startPasskey}
             disabled={isPending}
-            className="text-primary-fg relative flex h-[52px] w-full items-center justify-center rounded-pill text-sm font-bold tracking-[0.04em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
-            style={{ background: "var(--primary)", boxShadow: "0 6px 22px var(--glow)" }}
+            className="text-primary-fg relative flex h-[42px] w-full items-center justify-center rounded-pill text-xs font-bold tracking-[0.08em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
+            style={{ background: "var(--primary)", boxShadow: "0 5px 18px var(--glow)" }}
           >
-            <Lock size={19} className="absolute left-[22px]" />
+            <Lock size={16} className="absolute left-[20px]" />
             SIGN IN WITH PASSKEY
           </button>
 
@@ -506,15 +503,15 @@ export function Onboarding() {
             type="button"
             onClick={() => startOAuth("oauth_x")}
             disabled={isPending}
-            className="text-text relative flex h-[52px] w-full items-center justify-center rounded-pill text-sm font-bold tracking-[0.04em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
+            className="text-text relative flex h-[42px] w-full items-center justify-center rounded-pill text-xs font-bold tracking-[0.08em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
             style={{ border: "1px solid var(--primary)", background: "transparent" }}
           >
             <svg
-              width="18"
-              height="18"
+              width="16"
+              height="16"
               viewBox="0 0 24 24"
               fill="currentColor"
-              className="absolute left-[23px]"
+              className="absolute left-[20px]"
               aria-hidden
             >
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -526,10 +523,10 @@ export function Onboarding() {
             type="button"
             onClick={() => startOAuth("oauth_google")}
             disabled={isPending}
-            className="text-text relative flex h-[52px] w-full items-center justify-center rounded-pill text-sm font-bold tracking-[0.04em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
+            className="text-text relative flex h-[42px] w-full items-center justify-center rounded-pill text-xs font-bold tracking-[0.08em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
             style={{ border: "1px solid var(--primary)", background: "transparent" }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" className="absolute left-[22px]" aria-hidden>
+            <svg width="17" height="17" viewBox="0 0 24 24" className="absolute left-[20px]" aria-hidden>
               <path fill="#4285F4" d="M21.6 12.2c0-.6-.1-1.3-.2-1.9H12v3.6h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.2Z" />
               <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.7-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22Z" />
               <path fill="#FBBC05" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9l3.3-2.6Z" />

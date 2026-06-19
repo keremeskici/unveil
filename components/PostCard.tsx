@@ -7,8 +7,10 @@ import {
   MessageCircle,
   CircleDollarSign,
   Bookmark,
-  MoreHorizontal,
   Lock,
+  MessageSquare,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { Avatar } from "./ui/Avatar";
 import { UnlockButton } from "./UnlockButton";
@@ -33,11 +35,19 @@ export type FeedPost = {
   unlockPrice: string;
   mediaType: "image" | "video";
   accessMode: "full" | "partial";
+  unlocked?: boolean;
+  revealedUrl?: string | null;
   poster?: string | null;
   regions?: PartialRegion[];
   createdAt?: string;
   social?: PostSocialState;
-  creator: { username: string | null; avatar: string | null; wallet: string | null };
+  creator: {
+    id?: string;
+    username: string | null;
+    avatar: string | null;
+    wallet: string | null;
+    following?: boolean;
+  };
 };
 
 function fmtCount(n: number) {
@@ -58,29 +68,35 @@ function haptic(pattern: number | number[]) {
 export function PostCard({
   post,
   isUnlocked: initialUnlocked,
+  initialSignedUrl,
   priority = false,
 }: {
   post: FeedPost;
   isUnlocked?: boolean;
+  initialSignedUrl?: string | null;
   priority?: boolean;
 }) {
   const { isSignedIn } = useAppAuth();
   const router = useRouter();
   const free = Number(post.unlockPrice) === 0;
   const [unlocked, setUnlocked] = useState(initialUnlocked ?? false);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(initialSignedUrl ?? null);
   const [messaging, setMessaging] = useState(false);
 
   // Social state (optimistic; seeded from the server-rendered feed).
   const [liked, setLiked] = useState(post.social?.liked ?? false);
   const [likeCount, setLikeCount] = useState(post.social?.likeCount ?? 0);
   const [saved, setSaved] = useState(post.social?.saved ?? false);
+  const [following, setFollowing] = useState(post.creator.following ?? false);
+  const [followPending, setFollowPending] = useState(false);
   const [commentCount, setCommentCount] = useState(
     post.social?.commentCount ?? 0,
   );
   const [burst, setBurst] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsClosing, setCommentsClosing] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
+  const [tipClosing, setTipClosing] = useState(false);
 
   const requireAuth = useCallback(() => {
     if (!isSignedIn) {
@@ -139,14 +155,55 @@ export function PostCard({
     }
   }, [saved, post.id, requireAuth]);
 
+  const toggleFollow = useCallback(async () => {
+    if (!requireAuth() || !post.creator.username || followPending) return;
+    haptic(5);
+    const next = !following;
+    setFollowing(next);
+    setFollowPending(true);
+    try {
+      const res = await fetch("/api/follow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: post.creator.username }),
+      });
+      if (res.ok) {
+        const d = (await res.json()) as { following: boolean };
+        setFollowing(d.following);
+      }
+    } catch {
+      setFollowing(!next);
+    } finally {
+      setFollowPending(false);
+    }
+  }, [followPending, following, post.creator.username, requireAuth]);
+
   const openComments = useCallback(() => {
     setCommentsOpen(true);
+    setCommentsClosing(false);
   }, []);
 
   const openTip = useCallback(() => {
     if (!requireAuth()) return;
     setTipOpen(true);
+    setTipClosing(false);
   }, [requireAuth]);
+
+  const closeComments = useCallback(() => {
+    setCommentsClosing(true);
+    window.setTimeout(() => {
+      setCommentsOpen(false);
+      setCommentsClosing(false);
+    }, 220);
+  }, []);
+
+  const closeTip = useCallback(() => {
+    setTipClosing(true);
+    window.setTimeout(() => {
+      setTipOpen(false);
+      setTipClosing(false);
+    }, 220);
+  }, []);
 
   const messageCreator = useCallback(async () => {
     if (!requireAuth()) return;
@@ -160,7 +217,7 @@ export function PostCard({
       });
       if (res.ok) {
         const { threadId } = (await res.json()) as { threadId: string };
-        router.push(`/messages/${threadId}`);
+        router.push(`/messages/${threadId}`, { transitionTypes: ["nav-forward"] });
       }
     } finally {
       setMessaging(false);
@@ -173,11 +230,11 @@ export function PostCard({
 
   return (
     <article
-      className="bg-surface-2 mb-4 overflow-hidden rounded-card"
+      className="feed-card bg-surface-2 mb-4 flex flex-col overflow-hidden rounded-md"
       style={{ boxShadow: "0 8px 24px rgba(0,0,0,.32)" }}
     >
       {/* Creator header */}
-      <header className="flex items-center gap-3 px-4 pt-3.5 pb-3">
+      <header className="flex items-center gap-3 px-4 pt-3 pb-2.5">
         <Avatar name={username} src={post.creator.avatar} size="lg" verified />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-tight font-semibold">{username}</p>
@@ -187,15 +244,29 @@ export function PostCard({
           type="button"
           onClick={messageCreator}
           disabled={messaging || !post.creator.wallet}
-          className="text-faint hover:text-muted flex size-9 items-center justify-center disabled:opacity-50"
-          aria-label="Message creator"
+          className="bg-surface-3 text-muted hover:text-text flex size-9 items-center justify-center rounded-full disabled:opacity-50"
+          aria-label="Chat with creator"
         >
-          <MoreHorizontal size={20} />
+          <MessageSquare size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={toggleFollow}
+          disabled={followPending || !post.creator.username}
+          className="border-hairline text-muted hover:text-text flex h-9 items-center gap-1.5 rounded-pill border px-3 text-[12.5px] font-semibold disabled:opacity-50"
+          aria-label={following ? "Unfollow creator" : "Follow creator"}
+          style={{
+            background: following ? "var(--surface-3)" : "var(--primary-tint)",
+            color: following ? "var(--muted)" : "var(--primary)",
+          }}
+        >
+          {following ? <UserCheck size={15} /> : <UserPlus size={15} />}
+          <span>{following ? "Following" : "Follow"}</span>
         </button>
       </header>
 
       {/* Caption */}
-      <p className="text-text px-4 pb-3 text-[15.5px] leading-relaxed">
+      <p className="text-text line-clamp-2 px-4 pb-2.5 text-[15px] leading-snug">
         {post.title}
       </p>
 
@@ -230,11 +301,13 @@ export function PostCard({
               >
                 <Lock size={24} />
               </div>
-              <UnlockButton
-                postId={post.id}
-                price={post.unlockPrice}
-                onUnlock={handleUnlock}
-              />
+              {!revealed && (
+                <UnlockButton
+                  postId={post.id}
+                  price={post.unlockPrice}
+                  onUnlock={handleUnlock}
+                />
+              )}
             </div>
           );
 
@@ -274,7 +347,7 @@ export function PostCard({
       </div>
 
       {/* Footer */}
-      <footer className="px-4 pt-3.5 pb-3.5">
+      <footer className="px-4 pt-3 pb-3">
         <div className="text-muted flex items-center gap-4">
           <button
             type="button"
@@ -344,7 +417,8 @@ export function PostCard({
           authorHandle={username}
           authorAvatar={post.creator.avatar}
           postedAt={post.createdAt}
-          onClose={() => setCommentsOpen(false)}
+          closing={commentsClosing}
+          onClose={closeComments}
           onCountChange={(d) => setCommentCount((c) => Math.max(0, c + d))}
         />
       )}
@@ -355,7 +429,8 @@ export function PostCard({
           creatorName={username}
           creatorHandle={`@${username}`}
           creatorAvatar={post.creator.avatar}
-          onClose={() => setTipOpen(false)}
+          closing={tipClosing}
+          onClose={closeTip}
         />
       )}
     </article>

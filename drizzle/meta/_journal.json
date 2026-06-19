@@ -43,6 +43,13 @@
       "when": 1781874792530,
       "tag": "0005_real_zuras",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781875200000,
+      "tag": "0006_mpp_call_ledger",
+      "breakpoints": true
     }
   ]
 }

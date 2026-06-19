@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
                 marginRight: 16,
               }}
             />
-            <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: 8 }}>VEIL</div>
+            <div style={{ fontSize: 36, fontWeight: 700 }}>UNVEIL</div>
           </div>
           <div
             style={{
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
         {/* balance */}
         <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
           <div style={{ fontSize: 26, color: MUTED, letterSpacing: 6, textTransform: "uppercase" }}>
-            VEIL balance
+            Unveil balance
           </div>
           <div style={{ fontSize: 150, fontWeight: 800, lineHeight: 1, marginTop: 8 }}>
             {balance}

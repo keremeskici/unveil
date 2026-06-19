@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Database, Sparkles } from "lucide-react";
-import { getFeed, getPostRegionsWithUnlocks } from "@/lib/db/queries";
-import { getFeedSocial } from "@/lib/db/social";
+import {
+  getFeed,
+  getFullPostUnlockOwnership,
+  getPostRegionsWithUnlocks,
+} from "@/lib/db/queries";
+import { getFeedSocial, getFollowedCreatorIds } from "@/lib/db/social";
 import {
   getCurrentAppUser,
   isCurrentAppUserAuthenticated,
@@ -20,12 +24,17 @@ export const dynamic = "force-dynamic";
 async function loadFeed(): Promise<FeedPost[] | null> {
   try {
     const [rows, fan] = await Promise.all([getFeed(20, 0), getCurrentAppUser()]);
-    const social = await getFeedSocial(
-      rows.map((p) => p.id),
-      fan?.id,
-    );
+    const postIds = rows.map((p) => p.id);
+    const creatorIds = rows.map((p) => p.creatorId);
+    const [social, followed, ownedRows] = await Promise.all([
+      getFeedSocial(postIds, fan?.id),
+      getFollowedCreatorIds(fan?.id, creatorIds),
+      fan?.id ? getFullPostUnlockOwnership(fan.id, postIds) : Promise.resolve([]),
+    ]);
+    const owned = new Map(ownedRows.map((r) => [r.postId, r.privateMediaKey]));
     return await Promise.all(
       rows.map(async (p) => {
+        const ownedMediaKey = owned.get(p.id);
         const post: FeedPost = {
           id: p.id,
           title: p.title,
@@ -35,12 +44,16 @@ async function loadFeed(): Promise<FeedPost[] | null> {
           unlockPrice: p.unlockPrice,
           mediaType: p.mediaType,
           accessMode: p.accessMode,
+          unlocked: !!ownedMediaKey,
+          revealedUrl: ownedMediaKey ? await presignPrivateGet(ownedMediaKey, 300) : null,
           createdAt: p.createdAt?.toISOString(),
           social: social.get(p.id),
           creator: {
+            id: p.creatorId,
             username: p.creator?.username ?? null,
             avatar: p.creator?.avatar ?? null,
             wallet: p.creator?.walletAddress ?? null,
+            following: followed.has(p.creatorId),
           },
         };
 
@@ -80,7 +93,7 @@ export default async function FeedPage() {
         <ConnectButton />
       </TopBar>
 
-      <div className="mx-auto w-full max-w-md flex-1 px-3.5 pt-3.5 pb-28">
+      <div className="feed-scroll mx-auto w-full max-w-md flex-1 overflow-y-auto px-3.5 pt-3.5 pb-28">
         {/* Composer */}
         <Link
           href="/new"
@@ -107,7 +120,13 @@ export default async function FeedPage() {
           />
         ) : (
           posts.map((post, i) => (
-            <PostCard key={post.id} post={post} priority={i === 0} />
+            <PostCard
+              key={post.id}
+              post={post}
+              isUnlocked={post.unlocked}
+              initialSignedUrl={post.revealedUrl}
+              priority={i === 0}
+            />
           ))
         )}
       </div>

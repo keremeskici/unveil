@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Lock, Search as SearchIcon, TrendingUp } from "lucide-react";
+import {
+  ArrowLeft,
+  Lock,
+  MessageSquare,
+  Search as SearchIcon,
+  TrendingUp,
+} from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { BottomNav } from "@/components/BottomNav";
 import { useAppAuth } from "@/components/useAppAuth";
@@ -22,6 +28,7 @@ type Creator = {
   username: string;
   displayName: string | null;
   avatar: string | null;
+  walletAddress: string;
   fanCount: number;
   following: boolean;
 };
@@ -119,6 +126,25 @@ export default function SearchPage() {
     [isSignedIn, router],
   );
 
+  const messageCreator = useCallback(
+    async (creator: Creator) => {
+      if (!isSignedIn) {
+        router.push("/sign-in");
+        return;
+      }
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creatorWallet: creator.walletAddress }),
+      });
+      if (res.ok) {
+        const { threadId } = (await res.json()) as { threadId: string };
+        router.push(`/messages/${threadId}`, { transitionTypes: ["nav-forward"] });
+      }
+    },
+    [isSignedIn, router],
+  );
+
   const trimmed = query.trim();
 
   return (
@@ -190,6 +216,14 @@ export default function SearchPage() {
                   @{cr.username} · {fanLabel(cr.fanCount)}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => messageCreator(cr)}
+                className="bg-surface-2 text-muted hover:text-text flex size-10 shrink-0 items-center justify-center rounded-full"
+                aria-label={`Chat with ${cr.username}`}
+              >
+                <MessageSquare size={18} />
+              </button>
               <button
                 type="button"
                 onClick={() => toggleFollow(cr)}

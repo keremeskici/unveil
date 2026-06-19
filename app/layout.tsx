@@ -17,13 +17,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Veil — lift the veil",
-  description: "Pay-per-tap premium content with invisible app-balance payments.",
-  applicationName: "Veil",
+  title: "Unveil",
+  description: "Pay-per-tap premium content with MPP-backed reveals.",
+  applicationName: "Unveil",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Veil",
+    title: "Unveil",
   },
   formatDetection: { telephone: false },
   manifest: "/manifest.webmanifest",
@@ -36,7 +36,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover", // handles iPhone notch
-  themeColor: "#121012",
+  themeColor: "#000000",
 };
 
 // Applies the persisted theme before paint (dark default → no class). No FOUC.

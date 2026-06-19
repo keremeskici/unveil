@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { eq, and, asc, desc, inArray, ne, sql } from "drizzle-orm";
+import { eq, and, asc, desc, inArray, ne, sql, isNull } from "drizzle-orm";
 import { getDb } from "./index";
 import {
   users,
@@ -34,6 +34,63 @@ function clerkProfile(input: ClerkUserInput): Partial<typeof users.$inferInsert>
     displayName,
     imageUrl,
   };
+}
+
+function usernameBase(input: ClerkUserInput) {
+  const source =
+    input.displayName?.trim() || input.email?.split("@")[0]?.trim() || null;
+  if (!source) return null;
+
+  const base = source
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  if (!base) return null;
+  return base.length >= 3 ? base.slice(0, 20) : base.padEnd(3, "_");
+}
+
+function usernameCandidate(base: string, attempt: number) {
+  if (attempt === 0) return base.slice(0, 20);
+  const suffix = String(attempt + 1);
+  return `${base.slice(0, 20 - suffix.length)}${suffix}`;
+}
+
+function isUniqueViolation(err: unknown) {
+  return (err as { code?: string })?.code === "23505";
+}
+
+async function addGeneratedUsernameIfMissing(
+  user: typeof users.$inferSelect,
+  input: ClerkUserInput,
+) {
+  if (user.username) return user;
+
+  const base = usernameBase(input);
+  if (!base) return user;
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = usernameCandidate(base, attempt);
+    try {
+      const [updated] = await getDb()
+        .update(users)
+        .set({ username: candidate })
+        .where(and(eq(users.id, user.id), isNull(users.username)))
+        .returning();
+      if (updated) return updated;
+
+      const current = await getUserById(user.id);
+      return current ?? user;
+    } catch (err) {
+      if (isUniqueViolation(err)) continue;
+      throw err;
+    }
+  }
+
+  return user;
 }
 
 export async function upsertUser(walletAddress: string) {
@@ -109,7 +166,7 @@ export async function getOrCreateUserForClerk(input: ClerkUserInput) {
     .returning();
 
   await ensureUserBalance(user.id);
-  return user;
+  return addGeneratedUsernameIfMissing(user, input);
 }
 
 export async function attachAnonymousCustodialAccountToClerk({
@@ -120,7 +177,7 @@ export async function attachAnonymousCustodialAccountToClerk({
   clerkUser: ClerkUserInput;
 }) {
   const profile = clerkProfile(clerkUser);
-  return getDb().transaction(async (tx) => {
+  const user = await getDb().transaction(async (tx) => {
     const existing = await tx.query.users.findFirst({
       where: eq(users.clerkId, clerkUser.clerkId),
     });
@@ -163,6 +220,7 @@ export async function attachAnonymousCustodialAccountToClerk({
     await tx.insert(userBalances).values({ userId: created.id }).onConflictDoNothing();
     return created;
   });
+  return addGeneratedUsernameIfMissing(user, clerkUser);
 }
 
 /** Mark an existing local user as a creator. */
@@ -268,6 +326,29 @@ export async function hasUnlocked(fanId: string, postId: string) {
     where: and(eq(unlocks.fanId, fanId), eq(unlocks.postId, postId)),
   });
   return !!row;
+}
+
+export async function getFullPostUnlockOwnership(
+  fanId: string,
+  postIds: string[],
+) {
+  const ids = Array.from(new Set(postIds.filter(Boolean)));
+  if (ids.length === 0) return [];
+
+  return getDb()
+    .select({
+      postId: unlocks.postId,
+      privateMediaKey: posts.privateMediaKey,
+    })
+    .from(unlocks)
+    .innerJoin(posts, eq(unlocks.postId, posts.id))
+    .where(
+      and(
+        eq(unlocks.fanId, fanId),
+        inArray(unlocks.postId, ids),
+        eq(posts.accessMode, "full"),
+      ),
+    );
 }
 
 export async function recordUnlock(
@@ -392,7 +473,7 @@ export async function getUnlockedPosts(fanId: string, limit = 24) {
  * actor, the post, the gross amount paid, and when. The creator-cut split is
  * applied by the caller (see /api/notifications).
  */
-export type NotifType = "unlock" | "tip" | "comment" | "follow";
+export type NotifType = "unlock" | "tip" | "comment" | "follow" | "post";
 
 export type RawNotification = {
   type: NotifType;
@@ -407,11 +488,12 @@ export type RawNotification = {
 
 /**
  * Activity on *this user's* content, derived (no dedicated table) by unioning
- * four sources, newest first:
+ * five sources, newest first:
  *  - unlocks  → "unveiled your post"  (Unveils)
  *  - tips     → "tipped you"          (Tips)
  *  - comments → "commented on your post" (Mentions)
  *  - follows  → "started following you"
+ *  - posts    → "posted" from creators this user follows (New)
  * Amounts are gross; the caller applies the creator cut where relevant.
  */
 export async function getNotifications(
@@ -420,68 +502,84 @@ export async function getNotifications(
 ): Promise<RawNotification[]> {
   const db = getDb();
 
-  const [unlockRows, tipRows, commentRows, followRows] = await Promise.all([
-    db
-      .select({
-        id: unlocks.id,
-        amount: unlocks.amountPaid,
-        at: unlocks.unlockedAt,
-        postTitle: posts.title,
-        actorUsername: users.username,
-        actorWallet: users.walletAddress,
-        actorAvatar: users.avatar,
-      })
-      .from(unlocks)
-      .innerJoin(posts, eq(unlocks.postId, posts.id))
-      .innerJoin(users, eq(unlocks.fanId, users.id))
-      .where(eq(posts.creatorId, userId))
-      .orderBy(desc(unlocks.unlockedAt))
-      .limit(limit),
-    db
-      .select({
-        id: tips.id,
-        amount: tips.amount,
-        at: tips.createdAt,
-        postTitle: posts.title,
-        actorUsername: users.username,
-        actorWallet: users.walletAddress,
-        actorAvatar: users.avatar,
-      })
-      .from(tips)
-      .leftJoin(posts, eq(tips.postId, posts.id))
-      .innerJoin(users, eq(tips.fanId, users.id))
-      .where(eq(tips.creatorId, userId))
-      .orderBy(desc(tips.createdAt))
-      .limit(limit),
-    db
-      .select({
-        id: comments.id,
-        at: comments.createdAt,
-        postTitle: posts.title,
-        actorUsername: users.username,
-        actorWallet: users.walletAddress,
-        actorAvatar: users.avatar,
-      })
-      .from(comments)
-      .innerJoin(posts, eq(comments.postId, posts.id))
-      .innerJoin(users, eq(comments.userId, users.id))
-      .where(and(eq(posts.creatorId, userId), ne(comments.userId, userId)))
-      .orderBy(desc(comments.createdAt))
-      .limit(limit),
-    db
-      .select({
-        id: follows.id,
-        at: follows.createdAt,
-        actorUsername: users.username,
-        actorWallet: users.walletAddress,
-        actorAvatar: users.avatar,
-      })
-      .from(follows)
-      .innerJoin(users, eq(follows.followerId, users.id))
-      .where(eq(follows.followingId, userId))
-      .orderBy(desc(follows.createdAt))
-      .limit(limit),
-  ]);
+  const [unlockRows, tipRows, commentRows, followRows, postRows] =
+    await Promise.all([
+      db
+        .select({
+          id: unlocks.id,
+          amount: unlocks.amountPaid,
+          at: unlocks.unlockedAt,
+          postTitle: posts.title,
+          actorUsername: users.username,
+          actorWallet: users.walletAddress,
+          actorAvatar: users.avatar,
+        })
+        .from(unlocks)
+        .innerJoin(posts, eq(unlocks.postId, posts.id))
+        .innerJoin(users, eq(unlocks.fanId, users.id))
+        .where(eq(posts.creatorId, userId))
+        .orderBy(desc(unlocks.unlockedAt))
+        .limit(limit),
+      db
+        .select({
+          id: tips.id,
+          amount: tips.amount,
+          at: tips.createdAt,
+          postTitle: posts.title,
+          actorUsername: users.username,
+          actorWallet: users.walletAddress,
+          actorAvatar: users.avatar,
+        })
+        .from(tips)
+        .leftJoin(posts, eq(tips.postId, posts.id))
+        .innerJoin(users, eq(tips.fanId, users.id))
+        .where(eq(tips.creatorId, userId))
+        .orderBy(desc(tips.createdAt))
+        .limit(limit),
+      db
+        .select({
+          id: comments.id,
+          at: comments.createdAt,
+          postTitle: posts.title,
+          actorUsername: users.username,
+          actorWallet: users.walletAddress,
+          actorAvatar: users.avatar,
+        })
+        .from(comments)
+        .innerJoin(posts, eq(comments.postId, posts.id))
+        .innerJoin(users, eq(comments.userId, users.id))
+        .where(and(eq(posts.creatorId, userId), ne(comments.userId, userId)))
+        .orderBy(desc(comments.createdAt))
+        .limit(limit),
+      db
+        .select({
+          id: follows.id,
+          at: follows.createdAt,
+          actorUsername: users.username,
+          actorWallet: users.walletAddress,
+          actorAvatar: users.avatar,
+        })
+        .from(follows)
+        .innerJoin(users, eq(follows.followerId, users.id))
+        .where(eq(follows.followingId, userId))
+        .orderBy(desc(follows.createdAt))
+        .limit(limit),
+      db
+        .select({
+          id: posts.id,
+          at: posts.createdAt,
+          postTitle: posts.title,
+          actorUsername: users.username,
+          actorWallet: users.walletAddress,
+          actorAvatar: users.avatar,
+        })
+        .from(follows)
+        .innerJoin(posts, eq(posts.creatorId, follows.followingId))
+        .innerJoin(users, eq(posts.creatorId, users.id))
+        .where(and(eq(follows.followerId, userId), eq(posts.isPublished, true)))
+        .orderBy(desc(posts.createdAt))
+        .limit(limit),
+    ]);
 
   const merged: RawNotification[] = [
     ...unlockRows.map((r) => ({ type: "unlock" as const, ...r })),
@@ -500,6 +598,16 @@ export async function getNotifications(
       type: "follow" as const,
       amount: null,
       postTitle: null,
+      id: r.id,
+      at: r.at,
+      actorUsername: r.actorUsername,
+      actorWallet: r.actorWallet,
+      actorAvatar: r.actorAvatar,
+    })),
+    ...postRows.map((r) => ({
+      type: "post" as const,
+      amount: null,
+      postTitle: r.postTitle,
       id: r.id,
       at: r.at,
       actorUsername: r.actorUsername,

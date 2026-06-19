@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Lock,
   Plus,
+  Phone,
   Send,
   X,
 } from "lucide-react";
@@ -59,6 +60,7 @@ export default function DmPage() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -118,6 +120,7 @@ export default function DmPage() {
         <div className="mx-auto flex w-full max-w-md items-center gap-3 px-4 py-3">
           <Link
             href="/messages"
+            transitionTypes={["nav-back"]}
             aria-label="Back"
             className="text-text flex size-[34px] items-center justify-center"
           >
@@ -140,6 +143,19 @@ export default function DmPage() {
               Active now
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setCallOpen(true)}
+            disabled={!thread || thread.viewerIsCreator}
+            className="text-muted flex size-[38px] items-center justify-center"
+            aria-label={
+              thread?.viewerIsCreator
+                ? "Paid calls are started by fans"
+                : "Start paid call"
+            }
+          >
+            <Phone size={19} />
+          </button>
           <button
             type="button"
             className="text-muted flex size-[38px] items-center justify-center"
@@ -233,6 +249,14 @@ export default function DmPage() {
           onClose={() => setAttachOpen(false)}
         />
       )}
+      {callOpen && (
+        <CallSheet
+          threadId={id}
+          name={thread?.name ?? "Creator"}
+          avatar={thread?.avatar ?? null}
+          onClose={() => setCallOpen(false)}
+        />
+      )}
     </main>
   );
 }
@@ -297,8 +321,8 @@ function PpvCard({ msg }: { msg: PpvMsg }) {
                   <Lock size={20} />
                 </div>
                 {msg.me ? (
-                  <span className="text-[12.5px] text-white/90">
-                    Locked · {msg.priceLabel} · sent
+                  <span className="rounded-pill bg-black/35 px-3 py-1.5 text-[12.5px] text-white/90">
+                    MPP locked · {msg.priceLabel} · sent
                   </span>
                 ) : (
                   <button
@@ -312,7 +336,7 @@ function PpvCard({ msg }: { msg: PpvMsg }) {
                       "Unlocking…"
                     ) : (
                       <>
-                        Unlock ·{" "}
+                        MPP unlock ·{" "}
                         <span className="tabular font-medium">{msg.priceLabel}</span>
                       </>
                     )}
@@ -331,6 +355,218 @@ function PpvCard({ msg }: { msg: PpvMsg }) {
           <div className="text-danger px-3.5 pb-2.5 text-[12px]">{error}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CallSheet({
+  threadId,
+  name,
+  avatar,
+  onClose,
+}: {
+  threadId: string;
+  name: string;
+  avatar: string | null;
+  onClose: () => void;
+}) {
+  const [phase, setPhase] = useState<"idle" | "ringing" | "connected" | "settling">(
+    "idle",
+  );
+  const [seconds, setSeconds] = useState(0);
+  const [chargedSeconds, setChargedSeconds] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const callIdRef = useRef<string | null>(null);
+  const ringTimerRef = useRef<number | null>(null);
+  const rate = 0.05;
+  const secondsRef = useRef(0);
+
+  function nextCallId() {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  useEffect(() => {
+    if (phase !== "connected") return;
+    const id = window.setInterval(() => {
+      secondsRef.current += 1;
+      setSeconds(secondsRef.current);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [phase]);
+
+  const settleCall = useCallback(async () => {
+    if (!callIdRef.current) return;
+    const duration = secondsRef.current;
+    setPhase("settling");
+    setError(null);
+    if (duration < 1) {
+      setPhase("idle");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/messages/${threadId}/call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callId: callIdRef.current,
+          tick: 1,
+          chargedSeconds: duration,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        detail?: string;
+        balance?: string;
+        chargedSeconds?: number;
+      };
+      if (res.status === 402) {
+        setError(body.detail ?? "Add funds to complete this call.");
+        setPhase("idle");
+        return;
+      }
+      if (!res.ok) {
+        setError(body.error ?? "Could not complete this call.");
+        setPhase("idle");
+        return;
+      }
+      setChargedSeconds(body.chargedSeconds ?? duration);
+      window.dispatchEvent(new Event("veil:balance-changed"));
+      setPhase("idle");
+    } finally {
+      callIdRef.current = null;
+    }
+  }, [threadId]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if (ringTimerRef.current) window.clearTimeout(ringTimerRef.current);
+    };
+  }, []);
+
+  const total = `$${(chargedSeconds * rate).toFixed(2)}`;
+  const estimatedTotal = `$${(seconds * rate).toFixed(2)}`;
+  const isCalling = phase === "ringing" || phase === "connected";
+  const statusText =
+    phase === "ringing"
+      ? "Ringing..."
+      : phase === "connected"
+        ? "Connected"
+        : phase === "settling"
+          ? "Ending..."
+          : chargedSeconds > 0
+            ? "Call ended"
+            : "Ready to call";
+
+  const startCall = () => {
+    setError(null);
+    setChargedSeconds(0);
+    setSeconds(0);
+    secondsRef.current = 0;
+    callIdRef.current = nextCallId();
+    setPhase("ringing");
+    if (ringTimerRef.current) window.clearTimeout(ringTimerRef.current);
+    ringTimerRef.current = window.setTimeout(() => {
+      ringTimerRef.current = null;
+      setPhase("connected");
+    }, 2400);
+  };
+
+  const stopCall = () => {
+    if (phase === "ringing") {
+      if (ringTimerRef.current) window.clearTimeout(ringTimerRef.current);
+      ringTimerRef.current = null;
+      callIdRef.current = null;
+      setPhase("idle");
+      return;
+    }
+    if (phase === "connected") void settleCall();
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Paid call"
+      className="fixed inset-0 z-50 flex items-end justify-center"
+    >
+      <button
+        type="button"
+        aria-label="Close paid call"
+        className="absolute inset-0 cursor-default bg-black/60"
+        style={{ animation: "vscrim .2s ease both" }}
+        onClick={onClose}
+      />
+      <section
+        className="bg-surface border-hairline relative w-full max-w-md rounded-t-md border-t px-5 pt-5 text-center shadow-card"
+        style={{
+          animation: "vsheet .3s cubic-bezier(.22,1,.36,1) both",
+          paddingBottom: "max(26px, env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="text-muted hover:text-text absolute right-4 top-4 flex size-9 items-center justify-center"
+        >
+          <X size={21} />
+        </button>
+        <Avatar name={name} src={avatar} size="xl" verified />
+        <h2 className="mt-3 text-xl font-bold">{name}</h2>
+        <p className="text-faint mt-1 text-sm">{statusText}</p>
+        <div className="border-hairline bg-bg mt-6 rounded-md border px-4 py-5">
+          <div className="tabular text-[42px] font-bold leading-none">
+            {String(Math.floor(seconds / 60)).padStart(2, "0")}:
+            {String(seconds % 60).padStart(2, "0")}
+          </div>
+          <div className="text-muted mt-2 text-sm">
+            {chargedSeconds > 0 ? (
+              <>
+                Total <span className="tabular text-text">{total}</span>
+              </>
+            ) : (
+              <>
+                Rate <span className="tabular text-text">$0.05/sec</span>
+              </>
+            )}
+          </div>
+          {phase === "connected" && (
+            <div className="text-faint mt-1 text-xs">
+              Estimated <span className="tabular">{estimatedTotal}</span>
+            </div>
+          )}
+        </div>
+        {error && (
+          <p className="text-danger mt-4 text-sm font-semibold" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={isCalling ? stopCall : startCall}
+          disabled={phase === "settling"}
+          className="mt-5 flex h-[52px] w-full items-center justify-center rounded-pill text-base font-bold"
+          style={{
+            background: isCalling ? "var(--surface-3)" : "var(--primary)",
+            color: isCalling ? "var(--text)" : "var(--primary-fg)",
+            boxShadow: isCalling ? "none" : "var(--shadow-cta)",
+          }}
+        >
+          {phase === "settling"
+            ? "Ending..."
+            : isCalling
+              ? phase === "ringing"
+                ? "Cancel"
+                : "End call"
+              : "Start call"}
+        </button>
+      </section>
     </div>
   );
 }

@@ -27,6 +27,9 @@ const DEMO_CREATOR_WALLET =
 const DEMO_FAN_WALLET =
   process.env.DEMO_FAN_WALLET?.toLowerCase() ??
   "0x2222222222222222222222222222222222222222";
+const DEV_USER_WALLET =
+  process.env.DEV_USER_WALLET?.toLowerCase() ??
+  "0x3333333333333333333333333333333333333333";
 
 const DEMO_POSTS = [
   { name: "post1", title: "Golden hour rooftop", price: "0.05", seed: 7 },
@@ -67,8 +70,28 @@ async function seed() {
     })
     .returning();
 
+  const [devUser] = await db
+    .insert(users)
+    .values({
+      walletAddress: DEV_USER_WALLET,
+      clerkId: "dev_default_user",
+      email: "dev@unveil.local",
+      displayName: "Dev User",
+      username: "dev_user",
+    })
+    .onConflictDoUpdate({
+      target: users.clerkId,
+      set: {
+        email: "dev@unveil.local",
+        displayName: "Dev User",
+        username: "dev_user",
+      },
+    })
+    .returning();
+
   console.log(`creator: ${creator.username} (${creator.id})`);
   console.log(`fan: ${fan.username} (${fan.id})`);
+  console.log(`dev user: ${devUser.username} (${devUser.id})`);
 
   // Idempotency: drop this creator's posts (cascades unlocks), the fan's
   // loyalty, and any existing thread between the two.
@@ -77,6 +100,9 @@ async function seed() {
   await db
     .delete(threads)
     .where(and(eq(threads.creatorId, creator.id), eq(threads.fanId, fan.id)));
+  await db
+    .delete(threads)
+    .where(and(eq(threads.creatorId, creator.id), eq(threads.fanId, devUser.id)));
 
   // 2. Posts
   const created: { id: string; price: string }[] = [];
@@ -166,6 +192,30 @@ async function seed() {
     .set({ lastMessageAt: new Date(base + script.length * 1000) })
     .where(eq(threads.id, thread.id));
   console.log(`thread: ${thread.id} (${script.length} messages, 1 PPV)`);
+
+  const [devThread] = await db
+    .insert(threads)
+    .values({ creatorId: creator.id, fanId: devUser.id })
+    .returning();
+  const devScript = [
+    { senderId: creator.id, kind: "text" as const, body: "Welcome to the test chat.", postId: null },
+    { senderId: creator.id, kind: "ppv" as const, body: "MPP locked message test", postId: ppvPost.id },
+  ];
+  for (let i = 0; i < devScript.length; i++) {
+    await db.insert(messages).values({
+      threadId: devThread.id,
+      senderId: devScript[i].senderId,
+      kind: devScript[i].kind,
+      body: devScript[i].body,
+      postId: devScript[i].postId,
+      createdAt: new Date(base + (script.length + i + 1) * 1000),
+    });
+  }
+  await db
+    .update(threads)
+    .set({ lastMessageAt: new Date(base + (script.length + devScript.length + 1) * 1000) })
+    .where(eq(threads.id, devThread.id));
+  console.log(`dev thread: ${devThread.id} (${devScript.length} messages, 1 PPV)`);
 
   console.log("✓ seed complete");
 }

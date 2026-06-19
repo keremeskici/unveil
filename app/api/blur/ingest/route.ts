@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { createJob } from "@/lib/blur/jobs";
-import { startPipeline } from "@/lib/blur/state";
-import { presignPrivateGet } from "@/lib/blob";
+import { kickOff } from "@/lib/blur/state";
 
 // Postgres + Supabase Storage signing + video keyframe extraction need Node.
 export const runtime = "nodejs";
@@ -23,13 +22,16 @@ export async function POST(req: NextRequest) {
   // 1. Persist a job row (status: 'uploaded').
   const job = await createJob({ rawBlobKey, creatorId, mediaType, postId });
 
-  // 2. Signed URL Replicate can fetch — TTL must outlive the whole pipeline.
-  const signedRawUrl = await presignPrivateGet(rawBlobKey, 60 * 30);
-
-  // 3. Kick off the pipeline with a webhook; do NOT await completion.
-  //    Routes to the single Cog (P5) when configured, else the multi-stage chain.
-  await startPipeline(job.id, signedRawUrl, mediaType);
-
-  // 4. Return now. Replicate calls /api/blur/webhook as each stage finishes.
-  return Response.json({ jobId: job.id, status: "detecting" });
+  // 2. Kick off the pipeline (presign + create prediction + webhook); do NOT
+  //    await completion. Replicate calls /api/blur/webhook as each stage finishes.
+  try {
+    await kickOff(job);
+    return Response.json({ jobId: job.id, status: "detecting" });
+  } catch (err) {
+    // The create call failed transiently — leave the job `uploaded` with no
+    // prediction id so the reconcile cron re-kicks it. Report it honestly
+    // rather than claiming "detecting".
+    console.error("blur pipeline trigger failed (will be reconciled):", err);
+    return Response.json({ jobId: job.id, status: "uploaded" });
+  }
 }

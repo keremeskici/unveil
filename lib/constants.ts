@@ -51,5 +51,18 @@ export function formatUsd(amount: string | number): string {
 }
 
 export const APP_NAME = "Veil";
-export const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+// Absolute base URL for share links / OG cards / webhooks. Resilient to the
+// common misconfigurations: an EMPTY-STRING env var (not nullish, so `?? ` keeps
+// it) and a scheme-less host. Falls back to Vercel's injected deployment host
+// (server-side only — these are not NEXT_PUBLIC) before localhost.
+function resolveAppUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (explicit) return /^https?:\/\//i.test(explicit) ? explicit : `https://${explicit}`;
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() || process.env.VERCEL_URL?.trim();
+  if (host) return `https://${host}`;
+  return "http://localhost:3000";
+}
+
+export const APP_URL = resolveAppUrl();

@@ -9,8 +9,13 @@ import { BlurProgress } from "./BlurProgress";
 import type { DetectedRegion } from "@/lib/db/schema";
 
 const PROCESSING = ["uploaded", "detecting", "tracking", "compositing"];
+const RETRYABLE = ["failed", "manual_review"];
+// A job that hasn't even left `uploaded` after this long never started — its
+// kickoff was almost certainly lost. Surface a manual retry instead of an
+// endless spinner (the reconcile cron also recovers it, but far less promptly).
+const STALL_MS = 12_000;
 
-type Action = "approve" | "adjust" | "manual";
+type Action = "approve" | "adjust" | "manual" | "retry";
 
 export function ReviewPanel({
   jobId,
@@ -31,8 +36,20 @@ export function ReviewPanel({
   const [state, setState] = useState(status);
   const [busy, setBusy] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stalled, setStalled] = useState(false);
 
   const reviewable = state === "ready_for_review";
+  // Offer a retry on terminal-but-failed states, or on a kickoff that stalled.
+  const canRetry = RETRYABLE.includes(state) || (state === "uploaded" && stalled);
+
+  // Flag a job that's still `uploaded` after the stall window so the creator
+  // gets an escape hatch rather than a forever-spinner.
+  useEffect(() => {
+    setStalled(false);
+    if (state !== "uploaded") return;
+    const t = setTimeout(() => setStalled(true), STALL_MS);
+    return () => clearTimeout(t);
+  }, [state]);
 
   // While the pipeline is still running, poll until it reaches a terminal state,
   // then refresh so the server re-presigns the freshly-composited preview.
@@ -60,10 +77,11 @@ export function ReviewPanel({
       const url =
         action === "approve"
           ? `/api/blur/jobs/${jobId}/approve`
-          : `/api/blur/jobs/${jobId}/reject`;
-      // Approve with no overrides → publishJob uses the draft title/price set at upload.
-      const body =
-        action === "approve" ? {} : { mode: action === "manual" ? "manual" : "adjust" };
+          : action === "retry"
+            ? `/api/blur/jobs/${jobId}/retry`
+            : `/api/blur/jobs/${jobId}/reject`;
+      // approve/retry take no body; reject carries its mode (adjust | manual).
+      const body = action === "approve" || action === "retry" ? {} : { mode: action };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,7 +132,7 @@ export function ReviewPanel({
           ) : (
             <RegionOverlay src={previewUrl} regions={regions} alt="Blurred preview" />
           )
-        ) : PROCESSING.includes(state) ? (
+        ) : PROCESSING.includes(state) && !(state === "uploaded" && stalled) ? (
           <BlurProgress status={state} mediaType={mediaType} />
         ) : (
           <div className="text-faint flex aspect-[4/5] items-center justify-center text-[13px]">
@@ -170,12 +188,35 @@ export function ReviewPanel({
             </Button>
           </div>
         </div>
+      ) : canRetry ? (
+        <div className="mt-5 flex flex-col gap-3">
+          <RetryReason state={state} stalled={stalled} />
+          <Button onClick={() => run("retry")} loading={busy === "retry"} disabled={!!busy}>
+            <RotateCcw size={18} /> Retry auto-blur
+          </Button>
+        </div>
       ) : (
         <div className="mt-5">
           <ResultBanner state={state} />
         </div>
       )}
     </main>
+  );
+}
+
+function RetryReason({ state, stalled }: { state: string; stalled: boolean }) {
+  const msg =
+    state === "failed"
+      ? "Auto-blur failed before it finished."
+      : state === "manual_review"
+        ? "Sent to manual review — you can run the auto-blur again."
+        : stalled
+          ? "Processing didn’t start — the service may have been briefly unavailable."
+          : "Processing didn’t finish.";
+  return (
+    <p className="text-muted flex items-center gap-2 text-[14px]">
+      <TriangleAlert size={16} className="text-danger shrink-0" /> {msg}
+    </p>
   );
 }
 

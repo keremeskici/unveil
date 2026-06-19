@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { getJob, updateJob } from "@/lib/blur/jobs";
-import { detectStage } from "@/lib/blur/state";
-import { presignPrivateGet } from "@/lib/blob";
+import { kickOff } from "@/lib/blur/state";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -36,10 +35,11 @@ export async function POST(
     });
   }
 
-  // Re-run detection, escalating strength each attempt.
+  // Re-run detection, escalating strength each attempt. kickOff records the new
+  // prediction id only on success, so a transient failure leaves the job
+  // `uploaded` for the reconcile cron to re-kick (PRD §10).
   await updateJob(id, { status: "uploaded", attempts });
-  const rawUrl = await presignPrivateGet(job.rawBlobKey, 60 * 30);
-  await detectStage(id, rawUrl, job.mediaType, {
+  await kickOff(job, {
     dilation: Number(process.env.BLUR_MASK_DILATION ?? 12) + 8 * attempts,
     boxThreshold: Math.max(0.15, 0.3 - 0.05 * attempts),
   });

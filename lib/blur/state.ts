@@ -11,10 +11,26 @@ import { getJob, updateJob, addPredictionId, type BlurJob } from "./jobs";
 import type { DetectedRegion } from "@/lib/db/schema";
 
 // ── Webhook URL ───────────────────────────────────────────────────────────────
-// Replicate calls back here when a stage finishes. Must be a public URL.
+// Replicate calls back here when a stage finishes. It MUST be an absolute,
+// publicly-reachable HTTPS URL — otherwise Replicate rejects the prediction at
+// create time ("422 webhook: Not a valid HTTPS URL"). Resolution order:
+//   1. NEXT_PUBLIC_APP_URL (explicit; scheme prepended if missing)
+//   2. Vercel's injected deployment host (covers prod + preview deploys)
+//   3. localhost (dev — webhook won't be delivered, but create won't 422)
+// NOTE: `?? ` must NOT be used for (1): an EMPTY-STRING env var (exactly how it
+// was misconfigured on prod) is not nullish, so `?? fallback` keeps the "" and
+// produces a relative URL. Trim-and-truthy-check instead.
+function webhookBase(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (explicit) return /^https?:\/\//i.test(explicit) ? explicit : `https://${explicit}`;
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() || process.env.VERCEL_URL?.trim();
+  if (host) return `https://${host}`;
+  return "http://localhost:3000";
+}
+
 function webhookUrl(jobId: string, stage: "detect" | "track" | "cog"): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base}/api/blur/webhook?job=${jobId}&stage=${stage}`;
+  return `${webhookBase()}/api/blur/webhook?job=${jobId}&stage=${stage}`;
 }
 
 const TTL = 60 * 30; // signed-URL lifetime — must outlive the whole pipeline
@@ -27,14 +43,27 @@ export function usingCog(): boolean {
   return Boolean(process.env.REPLICATE_VEIL_AUTOBLUR_VERSION);
 }
 
-export async function startPipeline(
-  jobId: string,
-  rawUrl: string,
-  mediaType: "image" | "video",
+/**
+ * Single source of truth for (re)starting a job's pipeline from a persisted
+ * `blur_jobs` row: presign the raw upload, then fire the first stage — the
+ * single Cog when configured (P5), else the multi-stage chain (P2). Used by
+ * upload (`/api/posts`, `/api/blur/ingest`), the reconcile cron (to recover a
+ * job whose kickoff was lost), reject (re-run stronger), and manual retry.
+ * `opts` escalates detection strength on a re-run; ignored on the Cog path.
+ *
+ * IMPORTANT: detectStage/cogStage flip the job to `detecting` and record the
+ * prediction id ONLY after Replicate accepts the `create`. So if this throws
+ * (a transient 402/429/5xx at create), the job stays `uploaded` with no
+ * prediction id — the contract the reconcile cron relies on to re-kick it.
+ */
+export async function kickOff(
+  job: Pick<BlurJob, "id" | "rawBlobKey" | "mediaType">,
+  opts: DetectOpts = {},
 ) {
+  const rawUrl = await presignPrivateGet(job.rawBlobKey, TTL);
   return usingCog()
-    ? cogStage(jobId, rawUrl, mediaType)
-    : detectStage(jobId, rawUrl, mediaType);
+    ? cogStage(job.id, rawUrl, job.mediaType)
+    : detectStage(job.id, rawUrl, job.mediaType, opts);
 }
 
 // P5 — one prediction does detect+track+composite on the GPU box.

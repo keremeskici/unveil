@@ -126,6 +126,27 @@ export const DESIRED_REGIONS = [
   "vibrator",
 ];
 
+export const IMAGE_DESIRED_REGIONS = [
+  "shirtless man",
+  "shirtless male",
+  "shirtless upper body",
+  "bare upper body",
+  "bare male upper body",
+  "bare chest",
+  "bare male chest",
+  "shirtless chest",
+  "shirtless male chest",
+  "bare torso",
+  "bare male torso",
+  "shirtless torso",
+  "shirtless male torso",
+  "male torso",
+  "abdomen",
+  "abdominal muscles",
+  "abs",
+  ...DESIRED_REGIONS,
+];
+
 // Regions we never want to blur, even if they overlap a positive match.
 export const NEGATIVE_REGIONS = ["face", "clothing", "background"];
 

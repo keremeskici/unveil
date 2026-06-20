@@ -2,10 +2,16 @@ import { presignPrivateGet, uploadPrivate } from "@/lib/blob";
 import {
   createPredictionWithRetry,
   DESIRED_REGIONS,
+  IMAGE_DESIRED_REGIONS,
   NEGATIVE_REGIONS,
   GROUNDED_SAM_OUTPUT,
 } from "./replicate";
-import { compositeImageBlur, maskCoverage, fetchBuffer } from "./composite";
+import {
+  compositeImageBlur,
+  compositeImageBlurRegions,
+  maskCoverage,
+  fetchBuffer,
+} from "./composite";
 import { regionsToSam2Clicks } from "./geometry";
 import { getJob, updateJob, addPredictionId, type BlurJob } from "./jobs";
 import { SIGNED_URL_TTL, usingCog, webhookFields } from "./config";
@@ -72,17 +78,33 @@ export async function detectStage(
 ) {
 
   if (mediaType === "image") {
-    // grounded_sam does detect + mask in one call.
-    const pred = await createPredictionWithRetry({
-      version: process.env.REPLICATE_GROUNDED_SAM_VERSION!,
-      input: {
-        image: rawUrl,
-        mask_prompt: DESIRED_REGIONS.join(","),
-        negative_mask_prompt: NEGATIVE_REGIONS.join(","),
-        adjustment_factor: opts.dilation ?? Number(process.env.BLUR_MASK_DILATION ?? 12),
-      },
-      ...webhookFields(jobId, "detect"),
-    });
+    const useBoxDetector =
+      process.env.BLUR_IMAGE_BOX_DETECT !== "false" &&
+      !!process.env.REPLICATE_GROUNDING_DINO_VERSION;
+    const pred = useBoxDetector
+      ? await createPredictionWithRetry({
+          version: process.env.REPLICATE_GROUNDING_DINO_VERSION!,
+          input: {
+            image: rawUrl,
+            query: IMAGE_DESIRED_REGIONS.join(". "),
+            box_threshold:
+              opts.boxThreshold ?? Number(process.env.BLUR_IMAGE_BOX_THRESHOLD ?? 0.22),
+            text_threshold: Number(process.env.BLUR_IMAGE_TEXT_THRESHOLD ?? 0.2),
+            show_visualisation: false,
+          },
+          ...webhookFields(jobId, "detect"),
+        })
+      : await createPredictionWithRetry({
+          version: process.env.REPLICATE_GROUNDED_SAM_VERSION!,
+          input: {
+            image: rawUrl,
+            mask_prompt: DESIRED_REGIONS.join(","),
+            negative_mask_prompt: NEGATIVE_REGIONS.join(","),
+            adjustment_factor:
+              opts.dilation ?? Number(process.env.BLUR_MASK_DILATION ?? 12),
+          },
+          ...webhookFields(jobId, "detect"),
+        });
     await updateJob(jobId, { status: "detecting" });
     await addPredictionId(jobId, "detect", pred.id);
     return;
@@ -159,6 +181,13 @@ async function onCogComplete(job: BlurJob, output: unknown) {
 // ── on detect complete ─────────────────────────────────────────────────────
 async function onDetectComplete(job: BlurJob, output: unknown) {
   if (job.mediaType === "image") {
+    const regions = detectedRegionsFromOutput(output);
+    if (regions.length) {
+      await compositeImageBoxStage(job, regions);
+      return;
+    }
+
+    // Back-compat for already-running grounded_sam jobs:
     // grounded_sam → [annotated, neg, mask, inverted]; index 2 is the clean mask.
     const outputs = Array.isArray(output) ? (output as unknown[]).map(String) : [];
     const maskUrl = outputs[GROUNDED_SAM_OUTPUT.mask];
@@ -180,15 +209,7 @@ async function onDetectComplete(job: BlurJob, output: unknown) {
   }
 
   // video: grounding-dino → boxes.
-  const det = (output ?? {}) as {
-    detections?: Array<{ bbox: number[]; label: string; confidence: number }>;
-  };
-  const regions: DetectedRegion[] = (det.detections ?? []).map((d) => ({
-    label: d.label,
-    box: d.bbox as [number, number, number, number],
-    confidence: d.confidence,
-    frame: 0,
-  }));
+  const regions = detectedRegionsFromOutput(output);
   // box_threshold already filtered low-confidence boxes, so "no regions" = nothing found.
   if (!regions.length) {
     await updateJob(job.id, { status: "manual_review", detectionConfidence: "0" });
@@ -232,6 +253,38 @@ async function compositeImageStage(job: BlurJob, maskUrl: string, coverage: numb
     originalBlobKey: job.rawBlobKey,
     detectionConfidence: String(coverage),
   });
+}
+
+async function compositeImageBoxStage(job: BlurJob, regions: DetectedRegion[]) {
+  await updateJob(job.id, { status: "compositing" });
+  const rawUrl = await presignPrivateGet(job.rawBlobKey, SIGNED_URL_TTL);
+  const blurred = await compositeImageBlurRegions(rawUrl, regions);
+  const blob = await uploadPrivate(`blur-jobs/${job.id}/blurred.jpg`, blurred, {
+    contentType: "image/jpeg",
+    upsert: true,
+  });
+  const maxConf = regions.reduce((m, r) => Math.max(m, r.confidence), 0);
+  await updateJob(job.id, {
+    status: "ready_for_review",
+    blurredBlobUrl: blob.pathname,
+    originalBlobKey: job.rawBlobKey,
+    detectionConfidence: String(maxConf),
+    regions,
+  });
+}
+
+function detectedRegionsFromOutput(output: unknown): DetectedRegion[] {
+  const det = (output ?? {}) as {
+    detections?: Array<{ bbox: number[]; label?: string; confidence?: number }>;
+  };
+  return (det.detections ?? [])
+    .filter((d) => Array.isArray(d.bbox) && d.bbox.length >= 4)
+    .map((d) => ({
+      label: d.label ?? "detected area",
+      box: d.bbox.slice(0, 4) as [number, number, number, number],
+      confidence: Number(d.confidence ?? 0),
+      frame: 0,
+    }));
 }
 
 async function onTrackComplete(job: BlurJob, output: unknown) {

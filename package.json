@@ -10,6 +10,7 @@
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
     "db:migrate:call-sessions": "dotenv -e .env.local -- tsx scripts/apply-call-sessions-migration.ts",
+    "db:migrate:call-message-kind": "dotenv -e .env.local -- tsx scripts/apply-call-message-kind-migration.ts",
     "tempo:wallets:migrate": "dotenv -e .env.local -- tsx scripts/migrate-tempo-wallets.ts",
     "key:init": "dotenv -e .env.local -- tsx scripts/init-platform-key.ts",
     "key:rotate": "dotenv -e .env.local -- tsx scripts/init-platform-key.ts --rotate",

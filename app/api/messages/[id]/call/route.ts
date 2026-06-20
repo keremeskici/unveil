@@ -24,7 +24,7 @@ import {
   withCallSessionLock,
   type CallSession,
 } from "@/lib/db/calls";
-import { getThreadFor } from "@/lib/db/messages";
+import { getThreadFor, sendCallMessage } from "@/lib/db/messages";
 import {
   requireCurrentAppUser,
   setAccountCookie,
@@ -768,8 +768,22 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    await markCallSessionEnding({ callId, endedAt });
     const settledSeconds = billableSeconds(current, endedAt);
+
+    // The call connected (never-connected returns above). Log a WhatsApp-style
+    // "Voice call · mm:ss" bubble into the thread exactly once — on the first
+    // settle that ends this session. A retry (e.g. after an insufficient-funds
+    // stall leaves the row in "ending") re-enters here, so we gate on the
+    // pre-ending status to avoid posting the bubble twice.
+    if (current.status !== "ending") {
+      await sendCallMessage({
+        threadId: thread.id,
+        senderId: thread.fanId,
+        seconds: settledSeconds,
+      });
+    }
+
+    await markCallSessionEnding({ callId, endedAt });
     const finalReserveSeconds = settledSeconds - current.lastReservedSecond;
     if (finalReserveSeconds > 0) {
       const { amount, result } = await reserveSecondsForSession({

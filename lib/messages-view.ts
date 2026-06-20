@@ -40,7 +40,18 @@ export type ConversationPpvMsg = {
   previewUrl?: string | null;
 };
 
-export type ConversationMsg = ConversationTextMsg | ConversationPpvMsg;
+export type ConversationCallMsg = {
+  id: string;
+  kind: "call";
+  me: boolean;
+  /** Connected call duration in seconds (0 for a call that barely connected). */
+  seconds: number;
+};
+
+export type ConversationMsg =
+  | ConversationTextMsg
+  | ConversationPpvMsg
+  | ConversationCallMsg;
 
 export type ConversationView = {
   thread: ConversationThread;
@@ -68,6 +79,9 @@ export async function buildConversationView(
   const messages = await Promise.all(
     rows.map(async (m): Promise<ConversationMsg> => {
       const me = m.senderId === userId;
+      if (m.kind === "call") {
+        return { id: m.id, kind: "call", me, seconds: Number(m.body) || 0 };
+      }
       if (m.kind !== "ppv" || !m.postId) {
         return { id: m.id, kind: "text", me, text: m.body ?? "" };
       }

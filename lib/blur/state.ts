@@ -2,12 +2,11 @@ import { presignPrivateGet, uploadPrivate } from "@/lib/blob";
 import {
   createPredictionWithRetry,
   DESIRED_REGIONS,
-  IMAGE_DESIRED_REGIONS,
-  NEGATIVE_REGIONS,
   GROUNDED_SAM_OUTPUT,
 } from "./replicate";
 import {
   compositeImageBlur,
+  compositeImageBlurMockLowerCenter,
   compositeImageBlurRegions,
   maskCoverage,
   fetchBuffer,
@@ -40,6 +39,9 @@ export async function kickOff(
   opts: DetectOpts = {},
 ) {
   const rawUrl = await presignPrivateGet(job.rawBlobKey, SIGNED_URL_TTL);
+  if (job.mediaType === "image") {
+    return mockImageStage(job, rawUrl);
+  }
   return usingCog()
     ? cogStage(job.id, rawUrl, job.mediaType)
     : detectStage(job.id, rawUrl, job.mediaType, opts);
@@ -78,35 +80,9 @@ export async function detectStage(
 ) {
 
   if (mediaType === "image") {
-    const useBoxDetector =
-      process.env.BLUR_IMAGE_BOX_DETECT !== "false" &&
-      !!process.env.REPLICATE_GROUNDING_DINO_VERSION;
-    const pred = useBoxDetector
-      ? await createPredictionWithRetry({
-          version: process.env.REPLICATE_GROUNDING_DINO_VERSION!,
-          input: {
-            image: rawUrl,
-            query: IMAGE_DESIRED_REGIONS.join(". "),
-            box_threshold:
-              opts.boxThreshold ?? Number(process.env.BLUR_IMAGE_BOX_THRESHOLD ?? 0.22),
-            text_threshold: Number(process.env.BLUR_IMAGE_TEXT_THRESHOLD ?? 0.2),
-            show_visualisation: false,
-          },
-          ...webhookFields(jobId, "detect"),
-        })
-      : await createPredictionWithRetry({
-          version: process.env.REPLICATE_GROUNDED_SAM_VERSION!,
-          input: {
-            image: rawUrl,
-            mask_prompt: DESIRED_REGIONS.join(","),
-            negative_mask_prompt: NEGATIVE_REGIONS.join(","),
-            adjustment_factor:
-              opts.dilation ?? Number(process.env.BLUR_MASK_DILATION ?? 12),
-          },
-          ...webhookFields(jobId, "detect"),
-        });
-    await updateJob(jobId, { status: "detecting" });
-    await addPredictionId(jobId, "detect", pred.id);
+    const job = await getJob(jobId);
+    if (!job) return;
+    await mockImageStage(job, rawUrl);
     return;
   }
 
@@ -269,6 +245,25 @@ async function compositeImageBoxStage(job: BlurJob, regions: DetectedRegion[]) {
     blurredBlobUrl: blob.pathname,
     originalBlobKey: job.rawBlobKey,
     detectionConfidence: String(maxConf),
+    regions,
+  });
+}
+
+async function mockImageStage(
+  job: Pick<BlurJob, "id" | "rawBlobKey">,
+  rawUrl: string,
+) {
+  await updateJob(job.id, { status: "compositing", error: null });
+  const { blurredBuffer, regions } = await compositeImageBlurMockLowerCenter(rawUrl);
+  const blob = await uploadPrivate(`blur-jobs/${job.id}/blurred.jpg`, blurredBuffer, {
+    contentType: "image/jpeg",
+    upsert: true,
+  });
+  await updateJob(job.id, {
+    status: "ready_for_review",
+    blurredBlobUrl: blob.pathname,
+    originalBlobKey: job.rawBlobKey,
+    detectionConfidence: "1",
     regions,
   });
 }

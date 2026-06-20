@@ -197,3 +197,34 @@ export async function compositeImageBlurRegions(
   const maskBuf = await buildRegionMask(regions, width, height);
   return compositeBlurBuffers(imgBuf, maskBuf, opts);
 }
+
+/**
+ * Demo-safe image path: skip external detection and blur a predictable large
+ * lower-center rectangle so uploads never hang on detector/model failures.
+ */
+export async function compositeImageBlurMockLowerCenter(
+  imageUrl: string,
+  opts: BlurOptions = {},
+): Promise<{ blurredBuffer: Buffer; regions: DetectedRegion[] }> {
+  const imgBuf = await fetchBuffer(imageUrl);
+  const { width, height } = await sharp(imgBuf).metadata();
+  if (!width || !height) throw new Error("could not read image dimensions");
+
+  const regions: DetectedRegion[] = [
+    {
+      label: "preview area",
+      box: [
+        Math.round(width * 0.22),
+        Math.round(height * 0.42),
+        Math.round(width * 0.78),
+        Math.round(height * 0.92),
+      ],
+      confidence: 1,
+      frame: 0,
+    },
+  ];
+
+  const maskBuf = await buildRegionMask(regions, width, height);
+  const blurredBuffer = await compositeBlurBuffers(imgBuf, maskBuf, opts);
+  return { blurredBuffer, regions };
+}

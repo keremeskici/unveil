@@ -51,6 +51,7 @@ const POLL_STATUSES = new Set<JobStatus>([
   "tracking",
   "compositing",
 ]);
+const STALL_MS = 12_000;
 
 const RETRY_ENDPOINT_STATUSES = new Set<JobStatus>([
   "uploaded",
@@ -549,6 +550,7 @@ function ReviewScreen({
   onRerun: () => void;
 }) {
   const [mediaSize, setMediaSize] = useState<{ w: number; h: number } | null>(null);
+  const [stalled, setStalled] = useState(false);
   const processing =
     status === "uploading" ||
     status === "uploaded" ||
@@ -565,6 +567,13 @@ function ReviewScreen({
   useEffect(() => {
     setMediaSize(null);
   }, [previewUrl]);
+
+  useEffect(() => {
+    setStalled(false);
+    if (status !== "uploaded") return;
+    const timeout = window.setTimeout(() => setStalled(true), STALL_MS);
+    return () => window.clearTimeout(timeout);
+  }, [status]);
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-[18px] pt-[18px] pb-8">
@@ -649,6 +658,12 @@ function ReviewScreen({
         </p>
       )}
 
+      {stalled && !error && (
+        <p className="text-danger mt-3 rounded-md bg-danger/10 px-3 py-2 text-[13px]">
+          Processing did not start. Tap retry to run detection again.
+        </p>
+      )}
+
       <div className="mt-4 grid grid-cols-[1fr_auto] gap-2.5">
         <Button
           type="button"
@@ -698,7 +713,9 @@ function stepsFor(mediaType: MediaType): { key: StepKey; label: string }[] {
 }
 
 function stepState(status: JobStatus, key: StepKey) {
-  if (status === "published" || status === "approved") return "done";
+  if (status === "ready_for_review" || status === "published" || status === "approved") {
+    return "done";
+  }
   if (status === "failed" || status === "manual_review") {
     return key === "detecting" ? "active" : "pending";
   }
@@ -712,9 +729,7 @@ function stepState(status: JobStatus, key: StepKey) {
     "ready",
   ];
   const target = order.indexOf(key);
-  const current = order.indexOf(
-    effective === "ready_for_review" ? "ready" : effective,
-  );
+  const current = order.indexOf(effective);
 
   if (target < current) return "done";
   if (target === current) return "active";

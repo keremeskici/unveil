@@ -408,6 +408,13 @@ type ConversationTokenResponse = {
   environment?: string;
 };
 
+const ELEVENLABS_WORKLET_PATHS = {
+  rawAudioProcessor: "/elevenlabs-worklets/rawAudioProcessor.js",
+  audioConcatProcessor: "/elevenlabs-worklets/audioConcatProcessor.js",
+} as const;
+const ELEVENLABS_LIBSAMPLERATE_PATH =
+  "/elevenlabs-worklets/libsamplerate.worklet.js";
+
 function CallSheet(props: {
   threadId: string;
   name: string;
@@ -806,15 +813,16 @@ function CallSheetSession({
         throw new Error(errorMessage(body, "Could not start the voice session."));
       }
       const token = body.conversationToken ?? body.token ?? body.conversation_token;
-      if (!token) throw new Error("Voice session token was missing.");
+      const signedUrl =
+        typeof body.signedUrl === "string"
+          ? body.signedUrl
+          : typeof body.signed_url === "string"
+            ? body.signed_url
+            : null;
+      if (!token && !signedUrl) throw new Error("Voice session credentials were missing.");
       return {
-        token,
-        signedUrl:
-          typeof body.signedUrl === "string"
-            ? body.signedUrl
-            : typeof body.signed_url === "string"
-              ? body.signed_url
-              : null,
+        token: token ?? null,
+        signedUrl,
         serverLocation: body.serverLocation,
         environment: body.environment,
       };
@@ -945,20 +953,26 @@ function CallSheetSession({
       }
 
       setCallPhase("connecting");
-      const sessionConfig = token.signedUrl
-        ? {
-            signedUrl: token.signedUrl,
-            connectionType: "websocket" as const,
-            environment: token.environment,
-          }
-        : {
-            conversationToken: token.token,
-            connectionType: "webrtc" as const,
-            serverLocation: token.serverLocation,
-            environment: token.environment,
-          };
+      let sessionConfig;
+      if (token.signedUrl) {
+        sessionConfig = {
+          signedUrl: token.signedUrl,
+          connectionType: "websocket" as const,
+          environment: token.environment,
+        };
+      } else {
+        if (!token.token) throw new Error("Voice session credentials were missing.");
+        sessionConfig = {
+          conversationToken: token.token,
+          connectionType: "webrtc" as const,
+          serverLocation: token.serverLocation,
+          environment: token.environment,
+        };
+      }
       startSession({
         ...sessionConfig,
+        workletPaths: ELEVENLABS_WORKLET_PATHS,
+        libsampleratePath: ELEVENLABS_LIBSAMPLERATE_PATH,
         onConnect: ({ conversationId }) => {
           markConnected({
             callId,

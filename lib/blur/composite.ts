@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { DetectedRegion } from "@/lib/db/schema";
 
 // NOTE: sharp is a native Node module — it is NOT available in the Edge
 // runtime. Any route or worker that calls this must run on Node.js
@@ -36,6 +37,61 @@ export type BlurOptions = {
    */
   featherSigma?: number;
 };
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function rectForRegion(
+  region: DetectedRegion,
+  width: number,
+  height: number,
+  dilation: number,
+) {
+  let [x1, y1, x2, y2] = region.box;
+
+  // Some detectors return normalized boxes. The current GroundingDINO path
+  // returns pixels, but supporting both makes the compositor tolerant.
+  if (x2 <= 1 && y2 <= 1) {
+    x1 *= width;
+    x2 *= width;
+    y1 *= height;
+    y2 *= height;
+  }
+
+  const left = clamp(Math.floor(Math.min(x1, x2) - dilation), 0, width);
+  const top = clamp(Math.floor(Math.min(y1, y2) - dilation), 0, height);
+  const right = clamp(Math.ceil(Math.max(x1, x2) + dilation), 0, width);
+  const bottom = clamp(Math.ceil(Math.max(y1, y2) + dilation), 0, height);
+
+  return {
+    x: left,
+    y: top,
+    w: Math.max(0, right - left),
+    h: Math.max(0, bottom - top),
+  };
+}
+
+async function buildRegionMask(
+  regions: DetectedRegion[],
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  const dilation = Number(process.env.BLUR_MASK_DILATION ?? 12);
+  const rects = regions
+    .map((r) => rectForRegion(r, width, height, dilation))
+    .filter((r) => r.w >= 2 && r.h >= 2)
+    .map(
+      (r) =>
+        `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="white"/>`,
+    )
+    .join("");
+
+  if (!rects) throw new Error("no valid detection boxes");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="black"/>${rects}</svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
 
 /**
  * Turn the B&W mask into a soft alpha channel sized to the image.
@@ -122,4 +178,53 @@ export async function compositeImageBlur(
     fetchBuffer(maskUrl),
   ]);
   return compositeBlurBuffers(imgBuf, maskBuf, opts);
+}
+
+/**
+ * Box-based fallback/default for image detections. It avoids SAM mask failures
+ * when a prompt returns no segmentation masks but GroundingDINO still gives us
+ * useful regions, e.g. shirtless torso / bare chest demo uploads.
+ */
+export async function compositeImageBlurRegions(
+  imageUrl: string,
+  regions: DetectedRegion[],
+  opts: BlurOptions = {},
+): Promise<Buffer> {
+  const imgBuf = await fetchBuffer(imageUrl);
+  const { width, height } = await sharp(imgBuf).metadata();
+  if (!width || !height) throw new Error("could not read image dimensions");
+
+  const maskBuf = await buildRegionMask(regions, width, height);
+  return compositeBlurBuffers(imgBuf, maskBuf, opts);
+}
+
+/**
+ * Demo-safe image path: skip external detection and blur a predictable large
+ * lower-center rectangle so uploads never hang on detector/model failures.
+ */
+export async function compositeImageBlurMockLowerCenter(
+  imageUrl: string,
+  opts: BlurOptions = {},
+): Promise<{ blurredBuffer: Buffer; regions: DetectedRegion[] }> {
+  const imgBuf = await fetchBuffer(imageUrl);
+  const { width, height } = await sharp(imgBuf).metadata();
+  if (!width || !height) throw new Error("could not read image dimensions");
+
+  const regions: DetectedRegion[] = [
+    {
+      label: "preview area",
+      box: [
+        Math.round(width * 0.22),
+        Math.round(height * 0.42),
+        Math.round(width * 0.78),
+        Math.round(height * 0.92),
+      ],
+      confidence: 1,
+      frame: 0,
+    },
+  ];
+
+  const maskBuf = await buildRegionMask(regions, width, height);
+  const blurredBuffer = await compositeBlurBuffers(imgBuf, maskBuf, opts);
+  return { blurredBuffer, regions };
 }

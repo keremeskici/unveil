@@ -90,6 +90,83 @@ function isValidCallId(value: string) {
   return /^[a-zA-Z0-9_-]{8,80}$/.test(value);
 }
 
+function isRetryableElevenLabsStatus(status: number) {
+  return (
+    status === 408 ||
+    status === 409 ||
+    status === 425 ||
+    status === 429 ||
+    status >= 500
+  );
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseJsonText<T>(text: string) {
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return {} as T;
+  }
+}
+
+async function fetchElevenLabsJson<T>({
+  apiKey,
+  label,
+  url,
+}: {
+  apiKey: string;
+  label: string;
+  url: URL;
+}) {
+  let lastResult:
+    | { ok: true; status: number; payload: T }
+    | { ok: false; status: number; detail: string | null }
+    | null = null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { "xi-api-key": apiKey },
+        cache: "no-store",
+      });
+      const text = await response.text();
+      const payload = parseJsonText<T>(text);
+      if (response.ok) {
+        return { ok: true as const, status: response.status, payload };
+      }
+
+      lastResult = {
+        ok: false,
+        status: response.status,
+        detail: text.slice(0, 400) || null,
+      };
+      if (!isRetryableElevenLabsStatus(response.status)) break;
+    } catch (err) {
+      lastResult = {
+        ok: false,
+        status: 0,
+        detail: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    if (attempt < 2) await wait(200 * (attempt + 1));
+  }
+
+  console.warn("ElevenLabs request failed", { label, ...lastResult });
+  return (
+    lastResult ?? {
+      ok: false as const,
+      status: 0,
+      detail: "No response",
+    }
+  );
+}
+
 export async function GET(req: NextRequest) {
   let user;
   try {
@@ -177,49 +254,47 @@ export async function GET(req: NextRequest) {
   );
   signedUrl.searchParams.set("agent_id", agentId);
 
-  const [response, signedResponse] = await Promise.all([
-    fetch(url, {
-      method: "GET",
-      headers: { "xi-api-key": apiKey },
-      cache: "no-store",
+  const [tokenResult, signedResult] = await Promise.all([
+    fetchElevenLabsJson<{ token?: string }>({
+      apiKey,
+      label: "conversation-token",
+      url,
     }),
-    fetch(signedUrl, {
-      method: "GET",
-      headers: { "xi-api-key": apiKey },
-      cache: "no-store",
+    fetchElevenLabsJson<{ signed_url?: string; signedUrl?: string }>({
+      apiKey,
+      label: "signed-url",
+      url: signedUrl,
     }),
   ]);
 
-  if (!response.ok) {
+  const token = tokenResult.ok ? tokenResult.payload.token : null;
+  const signedPayload = signedResult.ok ? signedResult.payload : null;
+  const signedUrlValue = signedPayload?.signed_url ?? signedPayload?.signedUrl ?? null;
+
+  if (!token && !signedUrlValue) {
     return noStoreJson(
       {
-        error: "Could not create ElevenLabs conversation token",
-        status: response.status,
+        error: "Could not create ElevenLabs voice session",
+        status: tokenResult.status || signedResult.status || 502,
       },
       user.id,
       { status: 502 },
     );
   }
 
-  const payload = (await response.json().catch(() => ({}))) as {
-    token?: string;
-  };
-  const signedPayload = (await signedResponse.json().catch(() => ({}))) as {
-    signed_url?: string;
-    signedUrl?: string;
-  };
-  if (!payload.token) {
-    return noStoreJson(
-      { error: "ElevenLabs did not return a conversation token" },
-      user.id,
-      { status: 502 },
-    );
+  if (!token || !signedUrlValue) {
+    console.warn("ElevenLabs voice session using partial credentials", {
+      hasToken: Boolean(token),
+      hasSignedUrl: Boolean(signedUrlValue),
+      tokenStatus: tokenResult.status,
+      signedUrlStatus: signedResult.status,
+    });
   }
 
   return noStoreJson(
     {
-      token: payload.token,
-      signedUrl: signedPayload.signed_url ?? signedPayload.signedUrl ?? null,
+      token: token ?? null,
+      signedUrl: signedUrlValue,
       call: {
         callId: activeCall?.id ?? callId ?? null,
         threadId: thread.id,

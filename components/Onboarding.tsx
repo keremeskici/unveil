@@ -145,8 +145,13 @@ export function Onboarding() {
     }
     const setActive = mode === "sign-in" ? signInState.setActive : signUpState.setActive;
     await setActive({ session: sessionId });
+    await resetDemoState();
     router.replace("/");
     router.refresh();
+  }
+
+  async function resetDemoState() {
+    await fetch("/api/demo/reset", { method: "POST" }).catch(() => undefined);
   }
 
   async function prepareClientTrustEmailVerification(
@@ -245,6 +250,7 @@ export function Onboarding() {
         throw new Error(signInStatusMessage(result.status));
       }
       await signInState.setActive({ session: result.createdSessionId });
+      await resetDemoState();
       router.replace("/");
       router.refresh();
     } catch (err) {
@@ -266,6 +272,7 @@ export function Onboarding() {
         throw new Error("Email verification needs another step.");
       }
       await signUpState.setActive({ session: result.createdSessionId });
+      await resetDemoState();
       router.replace("/");
       router.refresh();
     } catch (err) {
@@ -311,12 +318,14 @@ export function Onboarding() {
           throw new Error("Could not reset password. Please try again.");
         }
         await signInState.setActive({ session: done.createdSessionId });
+        await resetDemoState();
         router.replace("/");
         router.refresh();
         return;
       }
       if (attempt.status === "complete" && attempt.createdSessionId) {
         await signInState.setActive({ session: attempt.createdSessionId });
+        await resetDemoState();
         router.replace("/");
         router.refresh();
         return;
@@ -377,6 +386,7 @@ export function Onboarding() {
         throw new Error("Passkey sign-in needs another verification step.");
       }
       await signInState.setActive({ session: result.createdSessionId });
+      await resetDemoState();
       router.replace("/");
       router.refresh();
     } catch (err) {
@@ -393,6 +403,7 @@ export function Onboarding() {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? "Dev login failed");
       }
+      await resetDemoState();
       notifyDevAuthChanged();
       router.replace("/");
       router.refresh();

@@ -44,7 +44,7 @@ export function Wordmark({
       <span
         className="font-bold"
         style={{
-          fontFamily: "var(--font-brand-manrope), sans-serif",
+          fontFamily: "var(--font-brand-satoshi), sans-serif",
           fontSize: size,
           letterSpacing: 0,
         }}

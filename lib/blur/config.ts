@@ -21,6 +21,10 @@ function webhookUrl(jobId: string, stage: BlurWebhookStage): string {
   return `${webhookBase()}/api/blur/webhook?job=${jobId}&stage=${stage}`;
 }
 
+export function hasDeliverableWebhook() {
+  return /^https:\/\//i.test(webhookUrl("healthcheck", "detect"));
+}
+
 // Replicate validates the webhook at create time and 422s on a non-HTTPS URL
 // (e.g. http://localhost during local dev). When the base isn't HTTPS, omit the
 // webhook and let polling/reconcile or the dev driver advance the job.

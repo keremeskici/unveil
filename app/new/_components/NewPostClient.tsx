@@ -423,9 +423,16 @@ function ComposeScreen({
         </label>
       </section>
 
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onPick}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onPick();
+          }
+        }}
         className="border-hairline-strong text-muted relative flex aspect-square w-full flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed bg-bg transition-transform active:scale-[0.99]"
         aria-label="Add media"
       >
@@ -453,7 +460,7 @@ function ComposeScreen({
             </span>
           </>
         )}
-      </button>
+      </div>
 
       <section className="bg-surface-2 mt-[18px] flex min-h-[76px] items-center justify-between gap-4 rounded-[18px] px-4">
         <div className="min-w-0">

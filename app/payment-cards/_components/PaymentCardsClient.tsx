@@ -280,12 +280,6 @@ export default function PaymentCardsPage() {
           <h1 className="flex-1 text-xl font-bold leading-none">
             Billing
           </h1>
-          <button
-            type="button"
-            className="text-primary hover:text-primary-hover flex h-9 items-center px-1 text-[13px] font-bold"
-          >
-            VERIFY
-          </button>
           {!mockCardAdded && (
             <button
               type="button"
@@ -389,7 +383,7 @@ export default function PaymentCardsPage() {
                     <CreditCard size={21} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[15px] font-semibold">Mock billing card</div>
+                    <div className="text-[15px] font-semibold">Billing card</div>
                     <div className="text-faint mt-1 text-[13px]">Ending in 4242</div>
                   </div>
                   <CheckCircle2 size={21} className="text-success" />
@@ -480,7 +474,7 @@ export default function PaymentCardsPage() {
                   <CreditCard size={21} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-semibold">Mock billing card</div>
+                  <div className="text-[15px] font-semibold">Billing card</div>
                   <div className="text-faint mt-1 text-[13px]">Ending in 4242</div>
                 </div>
                 <CheckCircle2 size={21} className="text-success" />

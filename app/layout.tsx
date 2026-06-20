@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Geist, Geist_Mono, Manrope } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
@@ -15,9 +16,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const brandManrope = Manrope({
-  variable: "--font-brand-manrope",
-  subsets: ["latin"],
+const brandSatoshi = localFont({
+  src: "./fonts/Satoshi-Bold.woff2",
+  variable: "--font-brand-satoshi",
+  display: "swap",
+  weight: "700",
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -79,7 +82,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${brandManrope.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${brandSatoshi.variable} h-full antialiased`}
     >
       <body className="bg-bg text-text flex min-h-full flex-col">
         <ClerkProvider>

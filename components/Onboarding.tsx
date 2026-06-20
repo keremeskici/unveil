@@ -29,6 +29,8 @@ type SignInWithSecondFactor = {
 
 const OAUTH_STATE_KEY_PREFIXES = ["__clerk_oauth", "clerk_oauth", "oauth"];
 const OAUTH_STATE_KEY_PARTS = ["oauth", "sso", "redirect"];
+const DEMO_EMAIL = "demo@unveil.local";
+const DEMO_PASSWORD = "unveil2026";
 
 function errorMessage(err: unknown) {
   const clerkError = err as { errors?: { longMessage?: string; message?: string }[] };
@@ -109,7 +111,6 @@ export function Onboarding() {
   const [showPw, setShowPw] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [isPending, setIsPending] = useState(false);
-  const [isDevPending, setIsDevPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isVerifyingClientTrust = mode === "sign-in" && signInStep === "client-trust";
   const isVerifyingSignUp = mode === "sign-up" && signUpStep === "verification";
@@ -175,6 +176,15 @@ export function Onboarding() {
     setError(null);
     try {
       if (mode === "sign-in") {
+        if (
+          isDevAuthEnabled() &&
+          email.trim().toLowerCase() === DEMO_EMAIL &&
+          password === DEMO_PASSWORD
+        ) {
+          await startDevLogin();
+          return;
+        }
+
         let result = await signInState.signIn.create({
           strategy: "password",
           identifier: email.trim(),
@@ -376,7 +386,6 @@ export function Onboarding() {
   }
 
   async function startDevLogin() {
-    setIsDevPending(true);
     setError(null);
     try {
       const res = await fetch("/api/dev/login", { method: "POST" });
@@ -389,7 +398,6 @@ export function Onboarding() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Dev login failed");
-      setIsDevPending(false);
     }
   }
 
@@ -421,7 +429,7 @@ export function Onboarding() {
           <span
             className="font-bold"
             style={{
-              fontFamily: "var(--font-brand-manrope), sans-serif",
+              fontFamily: "var(--font-brand-satoshi), sans-serif",
               fontSize: 27,
               letterSpacing: 0,
             }}
@@ -628,18 +636,6 @@ export function Onboarding() {
         </div>
 
         <div className="mt-auto flex flex-col gap-3">
-          {isDevAuthEnabled() && (
-            <button
-              type="button"
-              onClick={startDevLogin}
-              disabled={isPending || isDevPending}
-              className="text-primary-fg relative flex h-[42px] w-full items-center justify-center rounded-pill text-xs font-bold tracking-[0.08em] transition-transform duration-[140ms] ease-[var(--ease-veil)] active:scale-[0.985] disabled:opacity-60"
-              style={{ background: "var(--success)", boxShadow: "0 5px 18px rgba(43,180,119,.24)" }}
-            >
-              {isDevPending ? "OPENING DEV ACCOUNT..." : "CONTINUE AS DEV USER"}
-            </button>
-          )}
-
           <button
             type="button"
             onClick={startPasskey}

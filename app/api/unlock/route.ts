@@ -14,6 +14,10 @@ import {
   UnauthorizedError,
 } from "@/lib/app-user";
 import { settleUnlockWithCustodialWallet } from "@/lib/custodial-wallets";
+import {
+  checkOnChainSpendable,
+  getSpendableOnChainUsd,
+} from "@/lib/onchain-balance";
 
 // Postgres + Supabase Storage signing need the Node.js runtime.
 export const runtime = "nodejs";
@@ -110,6 +114,23 @@ export async function POST(req: NextRequest) {
   }
 
   // 2b. Custodial app-balance path: Clerk identity owns the local ledger row.
+  // The on-chain wallet is the spend authority — gate on its live balance.
+  const isPaidUnlock = Number(post.unlockPrice) > 0;
+  if (isPaidUnlock) {
+    const check = await checkOnChainSpendable(appUser.id, post.unlockPrice);
+    if (!check.ok) {
+      return jsonWithAccountCookie(
+        {
+          error: "Insufficient balance",
+          balance: check.balance,
+          required: post.unlockPrice,
+        },
+        appUser.id,
+        { status: 402 },
+      );
+    }
+  }
+
   const settlementMs = settlementStartedAt ? Date.now() - settlementStartedAt : 0;
   const unlock = await unlockWithCustodialBalance({
     userId: appUser.id,
@@ -130,7 +151,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const isPaidUnlock = Number(post.unlockPrice) > 0;
   if (unlock.status === "unlocked" && isPaidUnlock) {
     const settlement = await settleUnlockWithCustodialWallet({
       userId: appUser.id,
@@ -166,12 +186,17 @@ export async function POST(req: NextRequest) {
   const ttl = post.mediaType === "video" ? 300 : 60;
   const signedUrl = await presignPrivateGet(post.privateMediaKey, ttl);
 
+  const balance =
+    unlock.status === "unlocked"
+      ? await getSpendableOnChainUsd(appUser.id)
+      : undefined;
+
   return jsonWithAccountCookie(
     {
       signedUrl,
       settlementMs,
       alreadyUnlocked: unlock.status === "already_unlocked",
-      balance: unlock.status === "unlocked" ? unlock.balance : undefined,
+      balance,
       paymentTxHash: unlock.txHash,
     },
     appUser.id,

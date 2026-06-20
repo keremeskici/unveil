@@ -249,6 +249,61 @@ export async function settleCallWithCustodialWallet({
   }
 }
 
+export async function settleTipWithCustodialWallet({
+  userId,
+  creatorAddress,
+  amountUsd,
+  reference,
+}: {
+  userId: string;
+  creatorAddress: string;
+  amountUsd: string;
+  reference: string;
+}): Promise<CustodialSettlementResult> {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(creatorAddress)) {
+    return { ok: false, reason: "Creator wallet address is invalid" };
+  }
+
+  try {
+    const wallet = await getOrCreateCustodialWallet(userId);
+    const privateKey = decryptPrivateKey(wallet);
+    const account = privateKeyToAccount(privateKey);
+    const [{ createWalletClient, http, pad, parseUnits, stringToHex }, { Chain, tempoActions }] =
+      await Promise.all([import("viem"), import("viem/tempo")]);
+    const chain = Chain.moderato.extend({ feeToken: ALPHA_USD });
+    const client = createWalletClient({
+      account,
+      chain,
+      transport: http(process.env.TEMPO_RPC_URL ?? TEMPO_TESTNET.rpcHttp),
+    }).extend(tempoActions());
+
+    const memo = pad(stringToHex(`tip:${reference.slice(0, 18)}`), {
+      size: 32,
+    });
+    const result = await client.token.transferSync({
+      to: creatorAddress as `0x${string}`,
+      amount: parseUnits(stablecoinAmount(amountUsd), STABLECOIN_DECIMALS),
+      token: ALPHA_USD,
+      memo,
+    });
+    const txHash = result.receipt?.transactionHash;
+    if (!txHash) {
+      return { ok: false, reason: "Tempo receipt missing transaction hash" };
+    }
+
+    return {
+      ok: true,
+      txHash,
+      walletAddress: wallet.address,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : "tip settlement failed",
+    };
+  }
+}
+
 export async function fundCustodialWalletFromPlatform({
   userId,
   amountUsd,

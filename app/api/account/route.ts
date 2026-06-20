@@ -11,6 +11,7 @@ import {
   UnauthorizedError,
 } from "@/lib/app-user";
 import { ensureUserTempoWallet } from "@/lib/custodial-wallets";
+import { getSpendableOnChainUsd } from "@/lib/onchain-balance";
 import { getTopUpProvider } from "@/lib/payments";
 
 export const runtime = "nodejs";
@@ -29,8 +30,9 @@ export async function GET() {
     const user = await requireCurrentAppUser();
     const account = await getOrCreateCustodialAccount(user.id);
     const tempoWalletAddress = await getAccountWalletAddress(user.id);
+    const availableBalance = await getSpendableOnChainUsd(user.id);
     return jsonWithAccountCookie(
-      { account: { ...account, tempoWalletAddress } },
+      { account: { ...account, availableBalance, tempoWalletAddress } },
       user.id,
     );
   } catch (err) {
@@ -40,8 +42,9 @@ export async function GET() {
         cookieStore.get(CUSTODIAL_ACCOUNT_COOKIE)?.value,
       );
       const tempoWalletAddress = await getAccountWalletAddress(account.userId);
+      const availableBalance = await getSpendableOnChainUsd(account.userId);
       return jsonWithAccountCookie(
-        { account: { ...account, tempoWalletAddress } },
+        { account: { ...account, availableBalance, tempoWalletAddress } },
         account.userId,
       );
     }

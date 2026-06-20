@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getCustodialAccount,
   getMppCallEscrowStatus,
   normalizeMoney,
   releaseMppCallEscrow,
@@ -9,6 +8,10 @@ import {
   settleMppCallEscrow,
 } from "@/lib/custodial";
 import { settleCallWithCustodialWallet } from "@/lib/custodial-wallets";
+import {
+  checkOnChainSpendable,
+  getSpendableOnChainUsd,
+} from "@/lib/onchain-balance";
 import {
   ActiveCallSessionError,
   connectCallSession,
@@ -161,8 +164,7 @@ function sessionResponse(session: CallSession, extra?: Record<string, unknown>) 
 
 async function minimumBalanceChallenge(userId: string) {
   const required = callAmount(minStartBalanceSeconds());
-  const account = await getCustodialAccount(userId);
-  const balance = account?.availableBalance ?? "0";
+  const balance = await getSpendableOnChainUsd(userId);
   if (Number(balance) >= Number(required)) return null;
   return { required, balance };
 }
@@ -183,6 +185,21 @@ async function reserveSecondsForSession({
   tick: number;
 }) {
   const amount = callAmount(seconds);
+
+  // On-chain wallet is the spend authority. getSpendableOnChainUsd already
+  // subtracts what's escrowed, so each new tick is gated against real funds.
+  const check = await checkOnChainSpendable(fanId, amount);
+  if (!check.ok) {
+    return {
+      amount,
+      result: {
+        status: "insufficient_funds" as const,
+        balance: check.balance,
+        required: amount,
+      },
+    };
+  }
+
   const result = await reserveMppCallEscrow({
     fanId,
     creatorId,
@@ -214,6 +231,21 @@ async function legacyReserve({
   chargedSeconds: number;
 }) {
   const amount = callAmount(chargedSeconds);
+
+  // On-chain wallet is the spend authority for the reserve too.
+  const check = await checkOnChainSpendable(thread.fanId, amount);
+  if (!check.ok) {
+    return noStoreJson(
+      paymentChallenge({
+        amount,
+        balance: check.balance,
+        required: amount,
+      }),
+      userId,
+      { status: 402, headers: paymentRequiredHeaders(amount) },
+    );
+  }
+
   const result = await reserveMppCallEscrow({
     fanId: thread.fanId,
     creatorId: thread.creatorId,

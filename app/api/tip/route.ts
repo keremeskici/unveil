@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPost } from "@/lib/db/queries";
 import { normalizeMoney, tipWithCustodialBalance } from "@/lib/custodial";
 import {
+  getOrCreateCustodialWallet,
+  settleTipWithCustodialWallet,
+} from "@/lib/custodial-wallets";
+import {
+  checkOnChainSpendable,
+  getSpendableOnChainUsd,
+} from "@/lib/onchain-balance";
+import {
   requireCurrentAppUser,
   setAccountCookie,
   unauthorizedJson,
@@ -56,6 +64,45 @@ export async function POST(req: NextRequest) {
     ? Date.now() - settlementStartedAt
     : 0;
 
+  if (user.id === post.creatorId) {
+    return jsonWithAccountCookie(
+      { error: "You can't tip your own post" },
+      user.id,
+      { status: 400 },
+    );
+  }
+
+  // The on-chain wallet is the spend authority — gate on its live balance.
+  const check = await checkOnChainSpendable(user.id, normalized);
+  if (!check.ok) {
+    return jsonWithAccountCookie(
+      {
+        error: "Insufficient balance",
+        balance: check.balance,
+        required: normalized,
+      },
+      user.id,
+      { status: 402 },
+    );
+  }
+
+  // Move the tip on-chain (fan custodial wallet → creator custodial wallet),
+  // then mirror it into the ledger for history + loyalty.
+  const creatorWallet = await getOrCreateCustodialWallet(post.creatorId);
+  const settlement = await settleTipWithCustodialWallet({
+    userId: user.id,
+    creatorAddress: creatorWallet.address,
+    amountUsd: normalized,
+    reference: postId,
+  });
+  if (!settlement.ok) {
+    return jsonWithAccountCookie(
+      { error: "Settlement failed", settlementError: settlement.reason },
+      user.id,
+      { status: 402 },
+    );
+  }
+
   const result = await tipWithCustodialBalance({
     fanId: user.id,
     creatorId: post.creatorId,
@@ -63,6 +110,7 @@ export async function POST(req: NextRequest) {
     amount: normalized,
     message: message?.trim() || null,
     settlementMs,
+    paymentTxHash: settlement.txHash,
   });
 
   if (result.status === "self_tip") {
@@ -73,23 +121,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (result.status === "insufficient_funds") {
-    return jsonWithAccountCookie(
-      {
-        error: "Insufficient balance",
-        balance: result.balance,
-        required: result.required,
-      },
-      user.id,
-      { status: 402 },
-    );
-  }
-
+  const balance = await getSpendableOnChainUsd(user.id);
   return jsonWithAccountCookie(
     {
       status: "sent",
-      balance: result.balance,
-      paymentTxHash: result.txHash,
+      balance,
+      paymentTxHash: settlement.txHash,
       settlementMs,
     },
     user.id,

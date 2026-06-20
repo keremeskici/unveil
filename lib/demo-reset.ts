@@ -24,7 +24,7 @@ import type { AppUser } from "@/lib/app-user";
 
 const DEMO_RESET_EMAIL = "lordofsnakes1@gmail.com";
 const DEV_CLERK_ID = "dev_default_user";
-const DEMO_BALANCE = "20.00";
+const DEMO_BALANCE = "0";
 const CREATOR_USERNAMES = [
   "gamefilm_room",
   "sofia_bennett",
@@ -170,13 +170,15 @@ export async function resetDemoUserState(user: AppUser): Promise<DemoResetResult
       })
       .returning();
 
-    await tx.insert(custodialLedger).values({
-      userId: user.id,
-      eventType: "deposit",
-      amount: DEMO_BALANCE,
-      balanceAfter: balance.availableBalance,
-      reference: `demo-reset:${user.id}:${txHash()}`,
-    });
+    if (Number(DEMO_BALANCE) > 0) {
+      await tx.insert(custodialLedger).values({
+        userId: user.id,
+        eventType: "deposit",
+        amount: DEMO_BALANCE,
+        balanceAfter: balance.availableBalance,
+        reference: `demo-reset:${user.id}:${txHash()}`,
+      });
+    }
 
     for (let i = 0; i < creators.length; i++) {
       const creator = creators[i];

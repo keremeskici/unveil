@@ -11,7 +11,7 @@ export function TopBar({ children }: { children?: React.ReactNode }) {
       style={{ boxShadow: "var(--header-shadow)" }}
     >
       <div className="mx-auto flex w-full max-w-md items-center justify-between px-[18px] py-3.5">
-        <Wordmark showMark={false} />
+        <Wordmark showMark />
         <div className="flex items-center gap-1.5">
           <Link
             href="/search"

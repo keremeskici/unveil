@@ -2,7 +2,7 @@ import "server-only";
 
 import {
   getFeed,
-  getFullPostUnlockOwnership,
+  getWholePostUnlockOwnership,
   getPostRegionsWithUnlocks,
 } from "@/lib/db/queries";
 import { getFeedSocial, getFollowedCreatorIds } from "@/lib/db/social";
@@ -17,13 +17,23 @@ export async function buildFeedView(fanId: string): Promise<FeedPost[] | null> {
     const [social, followed, ownedRows] = await Promise.all([
       getFeedSocial(postIds, fanId),
       getFollowedCreatorIds(fanId, creatorIds),
-      getFullPostUnlockOwnership(fanId, postIds),
+      getWholePostUnlockOwnership(fanId, postIds),
     ]);
     const owned = new Map(ownedRows.map((r) => [r.postId, r.privateMediaKey]));
 
     return await Promise.all(
       rows.map(async (p) => {
         const ownedMediaKey = owned.get(p.id);
+        // Posts the feed reveals as a single unit (full posts, or any image —
+        // only partial *videos* use per-region unlocks). A free one has nothing
+        // to buy, so its clean media must ship with the feed — otherwise the card
+        // renders blurred with no unlock button (the overlay only exists for paid
+        // posts). Paid posts still only reveal once the fan owns the unlock.
+        const free = Number(p.unlockPrice) === 0;
+        const wholePostReveal = p.accessMode === "full" || p.mediaType === "image";
+        const revealKey =
+          ownedMediaKey ??
+          (free && wholePostReveal ? p.privateMediaKey : undefined);
         const post: FeedPost = {
           id: p.id,
           title: p.title,
@@ -40,8 +50,16 @@ export async function buildFeedView(fanId: string): Promise<FeedPost[] | null> {
           unlockPrice: p.unlockPrice,
           mediaType: p.mediaType,
           accessMode: p.accessMode,
-          unlocked: !!ownedMediaKey,
-          revealedUrl: ownedMediaKey ? await presignPrivateGet(ownedMediaKey, 300) : null,
+          unlocked: !!revealKey,
+          // Owned reveals are personal + short-lived; free reveals are identical
+          // for every fan, so quantize the expiry for CDN reuse like the preview.
+          revealedUrl: revealKey
+            ? await presignPrivateGet(
+                revealKey,
+                ownedMediaKey ? 300 : 3600,
+                ownedMediaKey ? {} : { cacheWindowSeconds: 600 },
+              )
+            : null,
           createdAt: p.createdAt?.toISOString(),
           social: social.get(p.id),
           creator: {

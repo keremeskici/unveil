@@ -1,4 +1,4 @@
-import { eq, and, asc, desc, inArray, ne, sql, isNull } from "drizzle-orm";
+import { eq, and, or, asc, desc, inArray, ne, sql, isNull } from "drizzle-orm";
 import { getDb } from "./index";
 import {
   users,
@@ -301,7 +301,19 @@ export async function hasUnlocked(fanId: string, postId: string) {
   return !!row;
 }
 
-export async function getFullPostUnlockOwnership(
+/**
+ * Whole-post unlock ownership for the feed. Returns the clean media key of every
+ * post in `postIds` that `fanId` owns via a row in `unlocks` (a one-time, durable
+ * purchase) AND that the feed reveals as a single unit.
+ *
+ * The feed only renders per-region micro-unlocks for partial *videos*
+ * (`PartialVideoStage`); every other post — full posts of either media type, and
+ * partial *images* — is bought through the whole-post `UnlockButton` → `/api/unlock`
+ * → `unlocks`. So the reveal predicate must mirror that: `full` OR `image`.
+ * (Filtering to `accessMode === "full"` here is what made paid partial-image posts
+ * re-lock on reload — their unlock row was written but never read back.)
+ */
+export async function getWholePostUnlockOwnership(
   fanId: string,
   postIds: string[],
 ) {
@@ -319,7 +331,7 @@ export async function getFullPostUnlockOwnership(
       and(
         eq(unlocks.fanId, fanId),
         inArray(unlocks.postId, ids),
-        eq(posts.accessMode, "full"),
+        or(eq(posts.accessMode, "full"), eq(posts.mediaType, "image")),
       ),
     );
 }

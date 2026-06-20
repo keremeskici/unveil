@@ -15,6 +15,7 @@ type Rect = { x: number; y: number; w: number; h: number }; // normalized 0..1
 type TrackPoint = { t: number; rect: Rect };
 const REVEAL_MASK_RADIUS_SCALE = 0.9;
 const REVEAL_MASK_SOLID_STOP = 86;
+const MIN_TRACKED_REGION_SIZE_PX = 24;
 
 export type PartialRegion = {
   id: string;
@@ -159,7 +160,14 @@ export function PartialVideoStage({
             if (patchEl) patchEl.style.visibility = "hidden";
             continue;
           }
+          const isEffectivelyHidden =
+            box.width < MIN_TRACKED_REGION_SIZE_PX ||
+            box.height < MIN_TRACKED_REGION_SIZE_PX;
           if (revealed[r.id] && patchEl) {
+            if (isEffectivelyHidden) {
+              patchEl.style.visibility = "hidden";
+              continue;
+            }
             const staticBox = boxFor(r.rect);
             if (staticBox) {
               const mask = revealMaskFor(box, staticBox);
@@ -171,6 +179,10 @@ export function PartialVideoStage({
               patchEl.style.webkitMaskRepeat = "no-repeat";
             }
           } else if (gateEl) {
+            if (isEffectivelyHidden) {
+              gateEl.style.visibility = "hidden";
+              continue;
+            }
             gateEl.style.visibility = "visible";
             gateEl.style.left = `${box.left}px`;
             gateEl.style.top = `${box.top}px`;
@@ -250,7 +262,10 @@ export function PartialVideoStage({
             }}
             className="absolute"
             // Initial box; the rAF loop owns it for tracked regions thereafter.
-            style={staticBox}
+            style={{
+              ...staticBox,
+              visibility: r.track && r.track.length > 0 ? "hidden" : "visible",
+            }}
           >
             <RegionGate
               postId={postId}
@@ -279,6 +294,9 @@ function sampleTrack(track: TrackPoint[], t: number): Rect | null {
   while (i < track.length && track[i].t < t) i++;
   const a = track[i - 1];
   const b = track[i];
+  if (isInactiveRect(a.rect) !== isInactiveRect(b.rect)) {
+    return t >= b.t ? b.rect : a.rect;
+  }
   const span = b.t - a.t || 1;
   const f = (t - a.t) / span;
   return {
@@ -287,6 +305,10 @@ function sampleTrack(track: TrackPoint[], t: number): Rect | null {
     w: a.rect.w + (b.rect.w - a.rect.w) * f,
     h: a.rect.h + (b.rect.h - a.rect.h) * f,
   };
+}
+
+function isInactiveRect(rect: Rect) {
+  return rect.w < 0.01 || rect.h < 0.01;
 }
 
 function revealMaskFor(inner: Box, outer: Box): string {

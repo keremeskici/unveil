@@ -17,6 +17,7 @@
     "seed": "dotenv -e .env.local -- tsx scripts/seed.ts",
     "reseed": "dotenv -e .env.local -- tsx scripts/reseed-posts.ts",
     "new-post": "dotenv -e .env.local -- tsx scripts/add-ppv-post.ts",
+    "mock-notifications": "dotenv -e .env.local -- tsx scripts/mock-notifications.ts",
     "token:create": "dotenv -e .env.local -- tsx scripts/create-token.ts"
   },
   "dependencies": {

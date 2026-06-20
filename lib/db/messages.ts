@@ -11,7 +11,7 @@ const participantCols = {
   walletAddress: true,
 } as const;
 
-export type MessageKind = "text" | "ppv";
+export type MessageKind = "text" | "ppv" | "call";
 
 /**
  * Find the fan↔creator thread, creating it on first contact. The unique index
@@ -105,7 +105,9 @@ export async function listThreads(userId: string) {
       ? "Say hello 👋"
       : lm.kind === "ppv"
         ? "🔒 Locked content"
-        : (lm.body ?? "");
+        : lm.kind === "call"
+          ? "📞 Voice call"
+          : (lm.body ?? "");
     return {
       id: t.id,
       lastMessageAt: t.lastMessageAt,
@@ -174,6 +176,24 @@ export async function sendMessage(input: {
     .set({ lastMessageAt: new Date() })
     .where(eq(threads.id, input.threadId));
   return msg;
+}
+
+/**
+ * Log a WhatsApp-style "Voice call" event in a thread once a paid call ends.
+ * The connected duration (seconds) is stashed in `body`; the sender is the fan
+ * who placed the call, so it renders as outgoing on their side.
+ */
+export async function sendCallMessage(input: {
+  threadId: string;
+  senderId: string;
+  seconds: number;
+}) {
+  return sendMessage({
+    threadId: input.threadId,
+    senderId: input.senderId,
+    kind: "call",
+    body: String(Math.max(0, Math.round(input.seconds))),
+  });
 }
 
 /** Mark every message the *other* party sent in this thread as read. */

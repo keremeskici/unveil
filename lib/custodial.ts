@@ -779,12 +779,9 @@ export async function unlockWithCustodialBalance({
         escrowedBalance: sql`${userBalances.escrowedBalance} + ${amount}`,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(userBalances.userId, userId),
-          sql`${userBalances.availableBalance} >= ${amount}`,
-        ),
-      )
+      // On-chain is the spend authority now (the route pre-checks the wallet
+      // and the settlement transfer is the real guard). The ledger just mirrors.
+      .where(eq(userBalances.userId, userId))
       .returning();
 
     if (!balance) {
@@ -943,6 +940,7 @@ export async function tipWithCustodialBalance({
   amount,
   message,
   settlementMs,
+  paymentTxHash,
 }: {
   fanId: string;
   creatorId: string;
@@ -950,6 +948,8 @@ export async function tipWithCustodialBalance({
   amount: string;
   message?: string | null;
   settlementMs: number;
+  /** Real on-chain settlement hash; falls back to an internal ref for the row. */
+  paymentTxHash?: string;
 }): Promise<CustodialTipResult> {
   if (fanId === creatorId) return { status: "self_tip" };
 
@@ -963,12 +963,9 @@ export async function tipWithCustodialBalance({
         availableBalance: sql`${userBalances.availableBalance} - ${amount}`,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(userBalances.userId, fanId),
-          sql`${userBalances.availableBalance} >= ${amount}`,
-        ),
-      )
+      // On-chain is the spend authority now (the route pre-checks the wallet
+      // and the settlement transfer is the real guard). The ledger just mirrors.
+      .where(eq(userBalances.userId, fanId))
       .returning();
 
     if (!fanBalance) {
@@ -1024,7 +1021,7 @@ export async function tipWithCustodialBalance({
         postId: postId ?? null,
         amount,
         message: message ?? null,
-        paymentTxHash: txHash,
+        paymentTxHash: paymentTxHash ?? txHash,
         settlementMs,
       })
       .returning();
@@ -1038,7 +1035,11 @@ export async function tipWithCustodialBalance({
       txHash,
     });
 
-    return { status: "sent", txHash, balance: fanBalance.availableBalance };
+    return {
+      status: "sent",
+      txHash: paymentTxHash ?? txHash,
+      balance: fanBalance.availableBalance,
+    };
   });
 }
 
@@ -1205,12 +1206,9 @@ export async function reserveMppCallEscrow({
         escrowedBalance: sql`${userBalances.escrowedBalance} + ${amount}`,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(userBalances.userId, fanId),
-          sql`${userBalances.availableBalance} >= ${amount}`,
-        ),
-      )
+      // On-chain is the spend authority now (the route pre-checks the wallet
+      // and the settlement transfer is the real guard). The ledger just mirrors.
+      .where(eq(userBalances.userId, fanId))
       .returning();
 
     if (!fanBalance) {
@@ -1440,12 +1438,9 @@ export async function unlockRegionWithCustodialBalance({
         escrowedBalance: sql`${userBalances.escrowedBalance} + ${amount}`,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(userBalances.userId, userId),
-          sql`${userBalances.availableBalance} >= ${amount}`,
-        ),
-      )
+      // On-chain is the spend authority now (the route pre-checks the wallet
+      // and the settlement transfer is the real guard). The ledger just mirrors.
+      .where(eq(userBalances.userId, userId))
       .returning();
 
     if (!balance) {

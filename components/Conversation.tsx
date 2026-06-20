@@ -10,6 +10,8 @@ import {
   Mic,
   MicOff,
   Phone,
+  PhoneIncoming,
+  PhoneOutgoing,
   Plus,
   Send,
   X,
@@ -18,6 +20,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useUnlock } from "@/components/useUnlock";
 import { useAppAuth } from "@/components/useAppAuth";
 import type {
+  ConversationCallMsg,
   ConversationMsg,
   ConversationPpvMsg,
   ConversationThread,
@@ -201,6 +204,8 @@ export function Conversation({
                     {m.text}
                   </div>
                 </div>
+              ) : m.kind === "call" ? (
+                <CallMessage key={m.id} msg={m} />
               ) : (
                 <PpvCard key={m.id} msg={m} />
               ),
@@ -267,6 +272,7 @@ export function Conversation({
           avatar={thread.avatar}
           isBot={thread.isBot}
           onClose={() => setCallOpen(false)}
+          onCallEnded={() => void refresh()}
         />
       )}
     </main>
@@ -280,6 +286,33 @@ function TypingBubble() {
         <span />
         <span />
         <span />
+      </div>
+    </div>
+  );
+}
+
+/** A WhatsApp-style "Voice call" event logged after a paid call ends. Outgoing
+ *  for the fan who placed it (right-aligned), incoming for the creator. */
+function CallMessage({ msg }: { msg: ConversationCallMsg }) {
+  const Icon = msg.me ? PhoneOutgoing : PhoneIncoming;
+  return (
+    <div className="flex" style={{ justifyContent: msg.me ? "flex-end" : "flex-start" }}>
+      <div
+        className="flex items-center gap-3 rounded-[20px] py-2.5 pl-2.5 pr-4"
+        style={{ background: "var(--surface-2)", color: "var(--text)" }}
+      >
+        <span
+          className="flex size-9 shrink-0 items-center justify-center rounded-full"
+          style={{ background: "var(--surface-3)", color: "var(--success)" }}
+        >
+          <Icon size={18} aria-hidden />
+        </span>
+        <div className="leading-tight">
+          <div className="text-[14.5px] font-semibold">Voice call</div>
+          <div className="tabular mt-0.5 text-[12.5px]" style={{ color: "var(--muted)" }}>
+            {formatDuration(msg.seconds)}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -414,6 +447,7 @@ function CallSheet(props: {
   avatar: string | null;
   isBot: boolean;
   onClose: () => void;
+  onCallEnded: () => void;
 }) {
   return (
     <ConversationProvider>
@@ -428,12 +462,14 @@ function CallSheetSession({
   avatar,
   isBot,
   onClose,
+  onCallEnded,
 }: {
   threadId: string;
   name: string;
   avatar: string | null;
   isBot: boolean;
   onClose: () => void;
+  onCallEnded: () => void;
 }) {
   const { startSession, endSession, isMuted, setMuted } = useConversation();
   const [phase, setPhase] = useState<CallPhase>("idle");
@@ -456,6 +492,12 @@ function CallSheetSession({
   const reservePromiseRef = useRef<Promise<boolean> | null>(null);
   const settlePromiseRef = useRef<Promise<void> | null>(null);
   const mountedRef = useRef(true);
+  // Latest-callback ref so settleCall (a stable useCallback) can notify the
+  // parent without taking onCallEnded as a dependency.
+  const onCallEndedRef = useRef(onCallEnded);
+  useEffect(() => {
+    onCallEndedRef.current = onCallEnded;
+  }, [onCallEnded]);
 
   const setCallPhase = useCallback((nextPhase: CallPhase) => {
     phaseRef.current = nextPhase;
@@ -723,6 +765,9 @@ function CallSheetSession({
             window.dispatchEvent(new Event("veil:balance-changed"));
             setCallPhase("ended");
           }
+          // The server logged the "Voice call" bubble as part of this settle —
+          // pull the thread so it shows up (fires even if the sheet unmounted).
+          onCallEndedRef.current?.();
         } finally {
           if (mountedRef.current) setBackgroundSettling(false);
           resetCallRefs();

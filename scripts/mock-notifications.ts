@@ -1,25 +1,26 @@
-// Seed mock notifications for two users: the Clerk account
-// kerem.eskici@yahoo.com and the cookie-auth dev user. Notifications in this app
-// have no table — they're derived from activity on a user's content (unlocks,
-// tips, comments, follows). So for each target we:
-//   1. give them a couple of published posts (generated media, like reseed), then
-//   2. have the existing mock creators unlock, follow, tip, and comment.
-// Idempotent: re-running wipes only the rows this script created for each target.
+// Seed mock notifications for the signed-in test account(s).
 //
-//   dotenv -e .env.local -- tsx scripts/mock-notifications.ts
+// Notifications in this app have no table — they're DERIVED from activity on a
+// user's content (unlocks, tips, comments, follows) plus new posts from the
+// creators the user follows (see lib/db/queries.ts > getNotifications). So to
+// make the Notifications tab non-empty we:
+//   1. give the target a couple of PAID posts (so "Unveiled" unlocks carry an
+//      amount), then
+//   2. have real existing users unlock, tip, comment on, and follow them, and
+//   3. follow a few creators who have posts (populates the "Following" tab).
+//
+// Actors + follow-creators are resolved DYNAMICALLY from whatever users exist in
+// the DB, so this keeps working across reseeds/re-themes (the old hardcoded
+// creator names did not). Idempotent: re-running wipes only the rows it created.
+//
+//   npm run mock-notifications
+//   (or: dotenv -e .env.local -- tsx scripts/mock-notifications.ts)
 //
 // Requires DATABASE_URL + BLOB_READ_WRITE_TOKEN in .env.local.
 import { randomBytes } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { getDb } from "../lib/db";
-import {
-  users,
-  posts,
-  unlocks,
-  tips,
-  comments,
-  follows,
-} from "../lib/db/schema";
+import { users, posts, unlocks, tips, comments, follows } from "../lib/db/schema";
 import { uploadPrivate } from "../lib/blob";
 import { makeFull, makePreview } from "./demo-image";
 
@@ -27,61 +28,63 @@ const txHash = () => "0x" + randomBytes(32).toString("hex");
 const MIN = 60 * 1000;
 const ago = (minutes: number) => new Date(Date.now() - minutes * MIN);
 
-// The mock creators (+ a fan) that act ON each target's content.
-const ACTOR_USERNAMES = [
-  "luna_after_dark",
-  "velvet_room",
-  "mia_unfiltered",
-  "nightshade",
-  "coral_bay",
-  "demo_fan",
-];
+// Whose Notifications tab to populate. The signed-in Clerk account by default.
+const TARGET_EMAILS = ["12345678910.kerem@gmail.com"];
 
-type Target = {
-  label: string;
-  lookup: { by: "clerkId" | "email"; value: string };
-  posts: { title: string; price: string; seed: number; minutesAgo: number }[];
-};
-
-const TARGETS: Target[] = [
-  {
-    label: "kerem.eskici@yahoo.com",
-    lookup: { by: "email", value: "kerem.eskici@yahoo.com" },
-    posts: [
-      { title: "Sunlit balcony", price: "3.00", seed: 101, minutesAgo: 3 * 24 * 60 },
-      { title: "Off-duty, off-guard", price: "4.00", seed: 137, minutesAgo: 36 * 60 },
-    ],
-  },
-  {
-    label: "dev user",
-    lookup: { by: "clerkId", value: "dev_default_user" },
-    posts: [
-      { title: "Studio test shoot", price: "2.50", seed: 211, minutesAgo: 2 * 24 * 60 },
-      { title: "Late night edit", price: "4.50", seed: 233, minutesAgo: 20 * 60 },
-    ],
-  },
+// Two paid posts so unlocks/tips have a price to settle against.
+const TARGET_POSTS = [
+  { title: "Buzzer-beater, every angle", price: "3.00", seed: 101, minutesAgo: 3 * 24 * 60 },
+  { title: "Full-time tactical breakdown", price: "4.00", seed: 137, minutesAgo: 36 * 60 },
 ];
 
 type Actor = { id: string; username: string };
 
-async function findTarget(t: Target) {
+/** Real users (with a wallet, so name/avatar render) to act on the target. */
+async function resolveFanActors(targetId: string, n: number): Promise<Actor[]> {
   const db = getDb();
-  const [row] = await db
-    .select({ id: users.id, username: users.username, email: users.email })
+  const rows = await db
+    .select({ id: users.id, username: users.username })
     .from(users)
     .where(
-      t.lookup.by === "email"
-        ? eq(users.email, t.lookup.value)
-        : eq(users.clerkId, t.lookup.value),
+      and(
+        ne(users.id, targetId),
+        isNotNull(users.username),
+        isNotNull(users.walletAddress),
+      ),
     )
-    .limit(1);
-  return row ?? null;
+    .orderBy(desc(users.createdAt))
+    .limit(n);
+  return rows.filter((r): r is Actor => Boolean(r.username));
 }
 
-async function seedFor(target: { id: string; username: string | null }, t: Target, actors: Actor[]) {
+/** Creators who already have published posts → feed the "Following" tab. */
+async function resolveFollowCreators(targetId: string, n: number): Promise<Actor[]> {
   const db = getDb();
-  const actorIds = actors.map((a) => a.id);
-  const titles = t.posts.map((p) => p.title);
+  const rows = await db
+    .select({ id: users.id, username: users.username, posts: count(posts.id) })
+    .from(users)
+    .innerJoin(
+      posts,
+      and(eq(posts.creatorId, users.id), eq(posts.isPublished, true)),
+    )
+    .where(and(eq(users.isCreator, true), ne(users.id, targetId)))
+    .groupBy(users.id, users.username)
+    .orderBy(desc(count(posts.id)))
+    .limit(n);
+  return rows
+    .filter((r): r is Actor & { posts: number } => Boolean(r.username))
+    .map((r) => ({ id: r.id, username: r.username }));
+}
+
+async function seedFor(target: { id: string; username: string | null; email: string | null }) {
+  const db = getDb();
+  const fans = await resolveFanActors(target.id, 6);
+  const followCreators = await resolveFollowCreators(target.id, 5);
+  if (fans.length === 0) throw new Error("No candidate actor users found in DB.");
+
+  const fanIds = fans.map((f) => f.id);
+  const creatorIds = followCreators.map((c) => c.id);
+  const titles = TARGET_POSTS.map((p) => p.title);
 
   // ── Idempotency: remove only what this script previously created ──────────
   // Deleting the posts cascades their unlocks + comments.
@@ -90,25 +93,22 @@ async function seedFor(target: { id: string; username: string | null }, t: Targe
     .where(and(eq(posts.creatorId, target.id), inArray(posts.title, titles)));
   await db
     .delete(tips)
-    .where(and(eq(tips.creatorId, target.id), inArray(tips.fanId, actorIds)));
+    .where(and(eq(tips.creatorId, target.id), inArray(tips.fanId, fanIds)));
+  // Inbound follows (fans → target) and outbound follows (target → creators).
   await db
     .delete(follows)
-    .where(
-      and(eq(follows.followingId, target.id), inArray(follows.followerId, actorIds)),
-    );
-  // Outbound follows (target → creators) drive the "Following" tab (their posts).
-  await db
-    .delete(follows)
-    .where(
-      and(eq(follows.followerId, target.id), inArray(follows.followingId, actorIds)),
-    );
+    .where(and(eq(follows.followingId, target.id), inArray(follows.followerId, fanIds)));
+  if (creatorIds.length)
+    await db
+      .delete(follows)
+      .where(and(eq(follows.followerId, target.id), inArray(follows.followingId, creatorIds)));
 
   // Make the target a creator so the posts/profile are coherent.
   await db.update(users).set({ isCreator: true }).where(eq(users.id, target.id));
 
-  // ── 1. Posts (generated media, published) ────────────────────────────────
+  // ── 1. Two paid posts (generated media, published) ────────────────────────
   const created: { id: string; price: string }[] = [];
-  for (const p of t.posts) {
+  for (const p of TARGET_POSTS) {
     const previewBlob = await uploadPrivate(
       `previews/mocknotif-${target.id}-${p.seed}.png`,
       makePreview(p.seed),
@@ -134,73 +134,62 @@ async function seedFor(target: { id: string; username: string | null }, t: Targe
       .returning();
     created.push({ id: row.id, price: p.price });
   }
+  const [post0, post1] = created;
 
-  const actor = (name: string) => actors.find((a) => a.username === name)!;
-  const post0 = created[0];
-  const post1 = created[1];
-
-  // ── 2. Follows  → "Following" tab ────────────────────────────────────────
-  const followPlan: { who: string; minutesAgo: number }[] = [
-    { who: "luna_after_dark", minutesAgo: 8 },
-    { who: "nightshade", minutesAgo: 95 },
-    { who: "coral_bay", minutesAgo: 6 * 60 },
-    { who: "mia_unfiltered", minutesAgo: 26 * 60 },
-    { who: "velvet_room", minutesAgo: 2 * 24 * 60 },
-  ];
-  for (const f of followPlan) {
+  // ── 2. Inbound follows → grow the "Fans" count ────────────────────────────
+  const followMinutes = [8, 95, 6 * 60, 26 * 60, 2 * 24 * 60, 4 * 24 * 60];
+  for (let i = 0; i < fans.length; i++) {
     await db
       .insert(follows)
       .values({
-        followerId: actor(f.who).id,
+        followerId: fans[i].id,
         followingId: target.id,
-        createdAt: ago(f.minutesAgo),
+        createdAt: ago(followMinutes[i] ?? (i + 1) * 90),
       })
       .onConflictDoNothing();
   }
 
-  // Target follows a few creators → their recent posts populate "Following".
-  const followingPlan = ["luna_after_dark", "velvet_room", "mia_unfiltered"];
-  for (const who of followingPlan) {
+  // Target follows creators → their recent posts populate "Following".
+  for (const c of followCreators) {
     await db
       .insert(follows)
-      .values({ followerId: target.id, followingId: actor(who).id })
+      .values({ followerId: target.id, followingId: c.id })
       .onConflictDoNothing();
   }
 
-  // ── 3. Unlocks  → "Unveiled" tab (with creator-cut amounts) ──────────────
-  const unlockPlan: { who: string; post: { id: string; price: string }; minutesAgo: number }[] = [
-    { who: "velvet_room", post: post0, minutesAgo: 14 },
-    { who: "mia_unfiltered", post: post1, minutesAgo: 52 },
-    { who: "coral_bay", post: post0, minutesAgo: 4 * 60 },
-    { who: "nightshade", post: post1, minutesAgo: 30 * 60 },
-    { who: "demo_fan", post: post0, minutesAgo: 44 * 60 },
-  ];
+  // ── 3. Unlocks → "Unveiled" tab (carry a creator-cut amount) ──────────────
+  const unlockPlan = [
+    { fan: fans[0], post: post0, minutesAgo: 14 },
+    { fan: fans[1], post: post1, minutesAgo: 52 },
+    { fan: fans[2], post: post0, minutesAgo: 4 * 60 },
+    { fan: fans[3], post: post1, minutesAgo: 30 * 60 },
+    { fan: fans[4], post: post0, minutesAgo: 44 * 60 },
+  ].filter((u) => u.fan);
   for (const u of unlockPlan) {
     await db
       .insert(unlocks)
       .values({
-        fanId: actor(u.who).id,
+        fanId: u.fan.id,
         postId: u.post.id,
         paymentTxHash: txHash(),
         amountPaid: u.post.price,
-        // Sub-second settlement is the "proof of magic" — keep it fast and
-        // independent of price (which now runs $2–5).
+        // Sub-second settlement is the "proof of magic" — keep it fast.
         settlementMs: 300 + Math.floor(Math.random() * 400),
         unlockedAt: ago(u.minutesAgo),
       })
       .onConflictDoNothing();
   }
 
-  // ── 4. Tips  → "Tips" tab ────────────────────────────────────────────────
-  const tipPlan: { who: string; amount: string; message: string; postId: string | null; minutesAgo: number }[] = [
-    { who: "luna_after_dark", amount: "5.00", message: "Obsessed with this 🔥", postId: post0.id, minutesAgo: 22 },
-    { who: "demo_fan", amount: "2.00", message: "Worth every cent 💸", postId: null, minutesAgo: 70 },
-    { who: "coral_bay", amount: "10.00", message: "You're unreal 😍", postId: post1.id, minutesAgo: 8 * 60 },
-    { who: "mia_unfiltered", amount: "1.50", message: "keep it coming!", postId: null, minutesAgo: 28 * 60 },
-  ];
+  // ── 4. Tips → "Tips" tab ──────────────────────────────────────────────────
+  const tipPlan = [
+    { fan: fans[0], amount: "5.00", message: "Best breakdown on here 🔥", postId: post0.id, minutesAgo: 22 },
+    { fan: fans[1], amount: "2.00", message: "Worth every cent 💸", postId: null as string | null, minutesAgo: 70 },
+    { fan: fans[2], amount: "10.00", message: "Replay GOAT 🐐", postId: post1.id, minutesAgo: 8 * 60 },
+    { fan: fans[3], amount: "1.50", message: "keep these coming!", postId: null, minutesAgo: 28 * 60 },
+  ].filter((t) => t.fan);
   for (const tp of tipPlan) {
     await db.insert(tips).values({
-      fanId: actor(tp.who).id,
+      fanId: tp.fan.id,
       creatorId: target.id,
       postId: tp.postId,
       amount: tp.amount,
@@ -211,25 +200,27 @@ async function seedFor(target: { id: string; username: string | null }, t: Targe
     });
   }
 
-  // ── 5. Comments (bonus; derived but not shown in the current filter tabs) ─
-  const commentPlan: { who: string; post: { id: string }; body: string; minutesAgo: number }[] = [
-    { who: "nightshade", post: post0, body: "This is unreal 😍", minutesAgo: 40 },
-    { who: "velvet_room", post: post1, body: "Stunning shot.", minutesAgo: 5 * 60 },
-    { who: "coral_bay", post: post0, body: "Need more like this!", minutesAgo: 33 * 60 },
-  ];
+  // ── 5. Comments (derived; not in the current filter tabs, but coherent) ───
+  const commentPlan = [
+    { fan: fans[0], post: post0, body: "That angle is unreal 😍", minutesAgo: 40 },
+    { fan: fans[1], post: post1, body: "Textbook spacing.", minutesAgo: 5 * 60 },
+    { fan: fans[2], post: post0, body: "Need more like this!", minutesAgo: 33 * 60 },
+  ].filter((c) => c.fan);
   for (const c of commentPlan) {
     await db.insert(comments).values({
       postId: c.post.id,
-      userId: actor(c.who).id,
+      userId: c.fan.id,
       body: c.body,
       createdAt: ago(c.minutesAgo),
     });
   }
 
   console.log(
-    `✓ @${target.username ?? target.id} (${t.label}): ${created.length} posts, ` +
-      `${followPlan.length} follows, ${unlockPlan.length} unlocks, ` +
-      `${tipPlan.length} tips, ${commentPlan.length} comments`,
+    `✓ @${target.username ?? target.id} (${target.email}): ` +
+      `${created.length} posts, ${fans.length} fans, ${unlockPlan.length} unlocks, ` +
+      `${tipPlan.length} tips, ${commentPlan.length} comments, ` +
+      `following ${followCreators.length} creators ` +
+      `[actors: ${fans.map((f) => "@" + f.username).join(", ")}]`,
   );
 }
 
@@ -237,29 +228,18 @@ async function main() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL not set");
   const db = getDb();
 
-  // Resolve actors.
-  const actorRows = await db
-    .select({ id: users.id, username: users.username })
+  const targets = await db
+    .select({ id: users.id, username: users.username, email: users.email })
     .from(users)
-    .where(inArray(users.username, ACTOR_USERNAMES));
-  const actors: Actor[] = actorRows
-    .filter((r): r is Actor => Boolean(r.username))
-    .map((r) => ({ id: r.id, username: r.username }));
+    .where(inArray(users.email, TARGET_EMAILS));
 
-  const missing = ACTOR_USERNAMES.filter((u) => !actors.some((a) => a.username === u));
-  if (missing.length) {
-    console.warn(`⚠ missing actor users: ${missing.join(", ")} (run npm run reseed first)`);
+  const found = new Set(targets.map((t) => t.email));
+  for (const e of TARGET_EMAILS) {
+    if (!found.has(e)) console.warn(`⚠ target not found: ${e} — skipping`);
   }
-  if (actors.length === 0) throw new Error("No actor users found — run the reseed script first.");
+  if (targets.length === 0) throw new Error("No target users found for the configured emails.");
 
-  for (const t of TARGETS) {
-    const target = await findTarget(t);
-    if (!target) {
-      console.warn(`⚠ target not found: ${t.label} — skipping`);
-      continue;
-    }
-    await seedFor(target, t, actors);
-  }
+  for (const t of targets) await seedFor(t);
 
   console.log("\n✓ mock notifications complete");
 }

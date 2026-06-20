@@ -13,6 +13,10 @@ import {
   UnauthorizedError,
 } from "@/lib/app-user";
 import { settleUnlockWithCustodialWallet } from "@/lib/custodial-wallets";
+import {
+  checkOnChainSpendable,
+  getSpendableOnChainUsd,
+} from "@/lib/onchain-balance";
 
 // Postgres + Supabase Storage signing need the Node.js runtime.
 export const runtime = "nodejs";
@@ -95,6 +99,19 @@ export async function POST(req: NextRequest) {
   const price = region.post.unlockPrice;
   const settlementMs = settlementStartedAt ? Date.now() - settlementStartedAt : 0;
 
+  // The on-chain wallet is the spend authority — gate on its live balance.
+  const isPaidUnlock = Number(price) > 0;
+  if (isPaidUnlock) {
+    const check = await checkOnChainSpendable(appUser.id, price);
+    if (!check.ok) {
+      return jsonWithAccountCookie(
+        { error: "Insufficient balance", balance: check.balance, required: price },
+        appUser.id,
+        { status: 402 },
+      );
+    }
+  }
+
   const unlock = await unlockRegionWithCustodialBalance({
     userId: appUser.id,
     postId,
@@ -115,7 +132,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const isPaidUnlock = Number(price) > 0;
   if (unlock.status === "unlocked" && isPaidUnlock) {
     void settleCustodialRegionUnlockInBackground({
       userId: appUser.id,
@@ -140,6 +156,11 @@ export async function POST(req: NextRequest) {
   // Short-lived signed URL for this region's clean crop.
   const signedUrl = await presignPrivateGet(region.patchMediaKey, 300);
 
+  const balance =
+    unlock.status === "unlocked"
+      ? await getSpendableOnChainUsd(appUser.id)
+      : undefined;
+
   return jsonWithAccountCookie(
     {
       signedUrl,
@@ -147,7 +168,7 @@ export async function POST(req: NextRequest) {
       settlementStatus:
         unlock.status === "unlocked" && isPaidUnlock ? "pending" : "complete",
       alreadyUnlocked: unlock.status === "already_unlocked",
-      balance: unlock.status === "unlocked" ? unlock.balance : undefined,
+      balance,
       paymentTxHash: unlock.txHash,
     },
     appUser.id,

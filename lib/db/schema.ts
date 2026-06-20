@@ -28,9 +28,11 @@ export const loyaltyEventTypeEnum = pgEnum("loyalty_event_type", [
   "streak_bonus",
 ]);
 
-// A DM is either plain text or a pay-per-view card that points at a post. PPV
-// messages reuse the existing posts/unlocks/Tempo path — see lib/db/messages.ts.
-export const messageKindEnum = pgEnum("message_kind", ["text", "ppv"]);
+// A DM is plain text, a pay-per-view card that points at a post, or a "call"
+// event logged after a paid voice call ends (the connected duration in seconds
+// lives in `body`). PPV reuses the existing posts/unlocks/Tempo path — see
+// lib/db/messages.ts.
+export const messageKindEnum = pgEnum("message_kind", ["text", "ppv", "call"]);
 
 export const callSessionStatusEnum = pgEnum("call_session_status", [
   "created",

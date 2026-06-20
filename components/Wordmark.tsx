@@ -16,7 +16,7 @@ export function CurtainMark({
         width,
         height,
         borderRadius: radius,
-        backgroundImage: "url('/unveil-eye-logo-v2.png')",
+        backgroundImage: "url('/unveil-red-eye-logo.jpeg')",
         backgroundPosition: "center",
         backgroundSize: "cover",
         boxShadow: glow,
